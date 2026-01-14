@@ -65,16 +65,16 @@ class Result(Base):
     
     # Ratings & Analysis
     prelim_rating = Column(Integer, nullable=False)  # Out of 100
-    grant_description = Column(Text, nullable=False)  # Summary of the grant
-    criteria = Column(ARRAY(String), nullable=False)  # Eligibility criteria
-    grant_amount = Column(String, nullable=False)  # Amount awarded (string for flexibility)
-    match_rating = Column(Integer, nullable=False)  # Percentage (0-100)
-    uncertainty_rating = Column(Integer, nullable=False)  # Percentage (0-100)
+    grant_description = Column(Text, nullable=True)  # Summary of the grant
+    criteria = Column(ARRAY(String), nullable=True)  # Eligibility criteria
+    grant_amount = Column(String, nullable=True)  # Amount awarded (string for flexibility)
+    match_rating = Column(Integer, nullable=True)  # Percentage (0-100)
+    uncertainty_rating = Column(Integer, nullable=True)  # Percentage (0-100)
     deadline = Column(DateTime, nullable=True)  # Grant deadline
-    sources = Column(ARRAY(String), nullable=False)  # URL links to grants
+    sources = Column(ARRAY(String), nullable=True)  # URL links to grants
     
     # Explanations as JSON
-    explanations = Column(JSON, nullable=False)
+    explanations = Column(JSON, nullable=True)
     # Expected structure: 
     # {
     #   "match_rating": "string explaining match rating",
