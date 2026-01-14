@@ -9,6 +9,7 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "sqlalchemy>=2.0.45",
     "psycopg2-binary>=2.9.9",
+    "google-genai>=1.57.0",
 ]
 
 [dependency-groups]
