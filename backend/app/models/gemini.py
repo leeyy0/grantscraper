@@ -57,6 +57,14 @@ class GeminiGrantAnalysis(BaseModel):
         description="Explanation of what information is missing or unclear that contributes to uncertainty"
     )
 
+    sponsor_name: str = Field(
+        description="Name of the organization or entity sponsoring the grant"
+    )
+
+    sponsor_description: str = Field(
+        description="Description of the sponsor organization, its mission, and background"
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -73,6 +81,8 @@ class GeminiGrantAnalysis(BaseModel):
                 "sources": ["https://oursg.gov.sg/grant/example"],
                 "match_rating_explanation": "Strong alignment with initiative's goal of digital literacy for seniors. Grant explicitly supports tech adoption in eldercare. Minor gap: grant emphasizes hardware while initiative focuses on training.",
                 "uncertainty_rating_explanation": "Grant description lacks detail on eligible training costs versus equipment costs. Unclear if capacity-building activities are covered.",
+                "sponsor_name": "Ministry of Social and Family Development",
+                "sponsor_description": "Government ministry responsible for social development and family support services in Singapore",
             }
         }
 
@@ -119,6 +129,8 @@ def gemini_to_sqlalchemy(
         sources=[
             str(url) for url in gemini_result.sources
         ],  # Convert HttpUrl to string
+        sponsor_name=gemini_result.sponsor_name,
+        sponsor_description=gemini_result.sponsor_description,
         explanations={
             "match_rating": gemini_result.match_rating_explanation,
             "uncertainty_rating": gemini_result.uncertainty_rating_explanation,
@@ -141,6 +153,8 @@ def sqlalchemy_to_dict(result: Result) -> dict:
         "uncertainty_rating": result.uncertainty_rating,
         "deadline": result.deadline.isoformat() if result.deadline else None,
         "sources": result.sources,
+        "sponsor_name": result.sponsor_name,
+        "sponsor_description": result.sponsor_description,
         "explanations": result.explanations,
         "grant_name": result.grant.name,
         "grant_url": result.grant.url,

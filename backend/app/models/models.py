@@ -117,6 +117,8 @@ class Result(Base):
     uncertainty_rating = Column(Integer, nullable=True)  # Percentage (0-100)
     deadline = Column(DateTime, nullable=True)  # Grant deadline
     sources = Column(ARRAY(String), nullable=True)  # URL links to grants
+    sponsor_name = Column(String, nullable=True)  # Name of the grant sponsor
+    sponsor_description = Column(Text, nullable=True)  # Description of the sponsor
 
     # Explanations as JSON
     explanations = Column(JSON, nullable=True)

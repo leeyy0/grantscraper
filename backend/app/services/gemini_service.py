@@ -153,7 +153,9 @@ Provide:
 5. Uncertainty rating (0-100) - how much information is missing or unclear
 6. Application deadline if available
 7. Source URLs for verification
-8. Detailed explanations for both ratings
+8. Sponsor name - the name of the organization or entity sponsoring the grant
+9. Sponsor description - description of the sponsor organization, its mission, and background
+10. Detailed explanations for both ratings
 
 Return the analysis in the structured JSON format.
 """
@@ -180,4 +182,6 @@ Return the analysis in the structured JSON format.
             sources=[grant_info.get("url", "")],
             match_rating_explanation=f"Error during analysis: {str(e)}",
             uncertainty_rating_explanation="Unable to complete analysis due to error",
+            sponsor_name="Unknown",
+            sponsor_description="Unable to determine sponsor information due to analysis error",
         )
