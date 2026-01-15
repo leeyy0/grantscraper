@@ -1,7 +1,12 @@
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
+from urllib.parse import urljoin
 
 from playwright.sync_api import Page, sync_playwright
+
+if TYPE_CHECKING:
+    from models.models import Grant
 
 
 def get_links(page: Page) -> list[dict[str, str]]:
@@ -107,6 +112,83 @@ def extract_card_body_text(page: Page, url: str) -> str:
     return text_content
 
 
+def extract_card_body_text_and_links(page: Page, url: str) -> tuple[str, list[str]]:
+    """Extract both text content and links from the card-body div in a single page visit.
+
+    This is more efficient than calling extract_card_body_text and extract_links_from_card_body
+    separately, as it only visits the page once.
+
+    Args:
+        page: Playwright page object
+        url: URL of the grant detail page to visit
+
+    Returns:
+        Tuple of (text_content, links) where:
+        - text_content: Clean plain text with structure preserved
+        - links: List of absolute URLs found in the card-body
+    """
+    page.goto(url)
+    page.wait_for_selector(".card-body", state="visible")
+
+    card_body = page.locator(".card-body").first
+
+    # Extract clean text content
+    text_content = card_body.inner_text()
+
+    # Extract all links from the card-body
+    links = []
+    link_elements = card_body.locator("a[href]")
+
+    for i in range(link_elements.count()):
+        href = link_elements.nth(i).get_attribute("href")
+        if href:
+            # Convert relative URLs to absolute
+            if href.startswith("http"):
+                links.append(href)
+            else:
+                # Use urljoin to properly handle relative URLs
+                absolute_url = urljoin(url, href)
+                links.append(absolute_url)
+
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_links = [link for link in links if link not in seen and not seen.add(link)]
+
+    return text_content, unique_links
+
+
+def extract_links_from_card_body(page: Page, url: str) -> list[str]:
+    """Extract all links (href attributes) from the card-body div.
+
+    Args:
+        page: Playwright page object
+        url: URL of the grant detail page to visit
+
+    Returns:
+        List of absolute URLs found in the card-body
+    """
+    page.goto(url)
+    page.wait_for_selector(".card-body", state="visible")
+
+    # Extract all links from the card-body
+    card_body = page.locator(".card-body").first
+    links = []
+    link_elements = card_body.locator("a[href]")
+
+    for i in range(link_elements.count()):
+        href = link_elements.nth(i).get_attribute("href")
+        if href:
+            # Convert relative URLs to absolute
+            if href.startswith("http"):
+                links.append(href)
+            else:
+                # Use urljoin to properly handle relative URLs
+                absolute_url = urljoin(url, href)
+                links.append(absolute_url)
+
+    return links
+
+
 def get_grant_details(
     page: Page, grant_links: list[dict[str, str]], use_text: bool = True
 ) -> list[dict[str, str]]:
@@ -114,7 +196,7 @@ def get_grant_details(
 
     This function is designed to extract grant content for LLM processing.
     By default, it returns clean text (recommended for LLMs), but can also
-    return HTML if needed.
+    return HTML if needed. Also extracts links from the card-body for deep scraping.
 
     Args:
         page: Playwright page object
@@ -126,6 +208,7 @@ def get_grant_details(
         - 'url': Grant URL
         - 'button_text': Button text from listing page
         - 'card_body_text' or 'card_body_html': Extracted content (depending on use_text)
+        - 'links': List of URLs found in the card-body
     """
     grant_details = []
 
@@ -133,23 +216,29 @@ def get_grant_details(
         print(f"Extracting content from: {grant['button_text']}")
         try:
             if use_text:
-                # Extract clean text - recommended for LLM processing
-                card_body_content = extract_card_body_text(page, grant["url"])
+                # Extract both text and links in a single page visit (more efficient)
+                card_body_content, links = extract_card_body_text_and_links(
+                    page, grant["url"]
+                )
                 grant_details.append(
                     {
                         "url": grant["url"],
                         "button_text": grant["button_text"],
                         "card_body_text": card_body_content,
+                        "links": links,
                     }
                 )
             else:
                 # Extract HTML - for other use cases
                 card_body_content = extract_card_body_content(page, grant["url"])
+                # Still need to extract links separately when using HTML
+                links = extract_links_from_card_body(page, grant["url"])
                 grant_details.append(
                     {
                         "url": grant["url"],
                         "button_text": grant["button_text"],
                         "card_body_html": card_body_content,
+                        "links": links,
                     }
                 )
         except Exception as e:
@@ -160,11 +249,34 @@ def get_grant_details(
                     "url": grant["url"],
                     "button_text": grant["button_text"],
                     key: None,
+                    "links": [],
                     "error": str(e),
                 }
             )
 
     return grant_details
+
+
+def get_grant_details_as_models(
+    page: Page, grant_links: list[dict[str, str]], use_text: bool = True
+) -> list["Grant"]:
+    """Get grant details and return as Grant SQLAlchemy model instances.
+
+    This is a convenience wrapper around get_grant_details() that converts
+    the dictionaries to Grant model instances.
+
+    Args:
+        page: Playwright page object
+        grant_links: List of grant link dictionaries with 'url' and 'button_text'
+        use_text: If True, extract clean text (recommended for LLM). If False, extract HTML.
+
+    Returns:
+        List of Grant SQLAlchemy model instances (not yet persisted to database)
+    """
+    from models.models import Grant
+
+    grant_dicts = get_grant_details(page, grant_links, use_text=use_text)
+    return [Grant.from_scraper_dict(grant_dict) for grant_dict in grant_dicts]
 
 
 # Screenshot directory - ensure screenshots go to backend/.private/screenshots

@@ -23,12 +23,49 @@ class Grant(Base):
     __tablename__ = "grants"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=True)  # Can be derived from button_text
     url = Column(String, nullable=False)
-    details = Column(Text, nullable=False)  # Use Text for long content
+    details = Column(Text, nullable=True)  # Legacy field, can store card_body_text/html
+    button_text = Column(String, nullable=True)  # Button text from listing page
+    card_body_text = Column(Text, nullable=True)  # Clean text content (for LLM)
+    card_body_html = Column(Text, nullable=True)  # HTML content (if use_text=False)
+    links = Column(ARRAY(String), nullable=True)  # URLs found in card-body
 
     # Relationships
     results = relationship("Result", back_populates="grant")
+
+    @classmethod
+    def from_scraper_dict(cls, grant_dict: dict) -> "Grant":
+        """Create a Grant instance from a dictionary returned by get_grant_details().
+
+        Args:
+            grant_dict: Dictionary with keys: url, button_text, card_body_text/card_body_html, links
+
+        Returns:
+            Grant instance (not yet persisted to database)
+        """
+        # Use button_text as name if available, otherwise extract from URL
+        name = grant_dict.get("button_text")
+        if not name:
+            # Fallback: extract grant ID from URL
+            url_parts = grant_dict.get("url", "").split("/")
+            if len(url_parts) >= 2:
+                name = (
+                    url_parts[-2] if url_parts[-1] == "instruction" else url_parts[-1]
+                )
+
+        # Store card_body_text in details for backward compatibility
+        details = grant_dict.get("card_body_text") or grant_dict.get("card_body_html")
+
+        return cls(
+            name=name,
+            url=grant_dict.get("url"),
+            details=details,
+            button_text=grant_dict.get("button_text"),
+            card_body_text=grant_dict.get("card_body_text"),
+            card_body_html=grant_dict.get("card_body_html"),
+            links=grant_dict.get("links", []),
+        )
 
 
 class Organisation(Base):

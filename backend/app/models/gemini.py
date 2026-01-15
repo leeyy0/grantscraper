@@ -1,8 +1,7 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field, HttpUrl
-
 from models import Result
+from pydantic import BaseModel, Field, HttpUrl
 
 # ============================================================================
 # Pydantic Models for Gemini Structured Output

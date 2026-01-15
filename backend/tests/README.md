@@ -17,7 +17,6 @@
 
 ### Run all tests
 ```bash
-cd /home/yy/nus/grantscraper/backend
 pytest tests/test_scraper.py -v
 ```
 
