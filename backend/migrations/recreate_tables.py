@@ -7,8 +7,8 @@ Usage:
     uv run migrations/recreate_tables
 """
 
-from ..app.core.config import DB_URL
-from ..app.models.models import Base
+from app.core.config.config import DB_URL
+from app.models.models import Base
 
 if __name__ == "__main__":
     from sqlalchemy import create_engine, inspect, text
