@@ -316,7 +316,7 @@ Routes for retrieving grant analysis results.
 
 ---
 
-#### 6. Get Results
+#### 5. Get Results
 
 Retrieve all grant analysis results for an initiative.
 
@@ -506,12 +506,7 @@ LOG_FILE=/var/log/grantscraper/api.log
 
 1. **Refresh grants** (do this first or periodically):
    ```bash
-   # Start refresh job
    curl -X POST "http://localhost:8000/grants/refresh"
-   # Response: {"job_id": "abc-123", ...}
-   
-   # Check status (poll until completed)
-   curl "http://localhost:8000/grants/refresh-status/abc-123"
    ```
 
 2. **Create organizations and initiatives** (via database or separate endpoints)
@@ -521,42 +516,15 @@ LOG_FILE=/var/log/grantscraper/api.log
    curl -X POST "http://localhost:8000/pipeline/filter-grants/123?threshold=60"
    ```
 
-4. **Monitor pipeline progress**:
+4. **Monitor progress**:
    ```bash
    curl "http://localhost:8000/pipeline/get-status?initiative_id=123"
    ```
 
-5. **Get results when pipeline completes**:
+5. **Get results**:
    ```bash
    curl "http://localhost:8000/results/123"
    ```
-
-### Real-World Example with Async Operations
-
-```bash
-# 1. Start grant refresh (returns immediately)
-REFRESH_RESPONSE=$(curl -X POST "http://localhost:8000/grants/refresh")
-JOB_ID=$(echo $REFRESH_RESPONSE | jq -r '.job_id')
-
-# 2. Poll for completion
-while true; do
-  STATUS=$(curl "http://localhost:8000/grants/refresh-status/$JOB_ID" | jq -r '.phase')
-  echo "Refresh status: $STATUS"
-  if [ "$STATUS" = "completed" ] || [ "$STATUS" = "error" ]; then
-    break
-  fi
-  sleep 5
-done
-
-# 3. Start filtering pipeline
-curl -X POST "http://localhost:8000/pipeline/filter-grants/123"
-
-# 4. Monitor pipeline (use SSE for real-time updates)
-curl -N "http://localhost:8000/pipeline/get-status-stream/123"
-
-# 5. Get final results
-curl "http://localhost:8000/results/123"
-```
 
 ---
 

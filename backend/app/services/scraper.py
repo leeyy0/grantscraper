@@ -88,8 +88,11 @@ def extract_card_body_content(page: Page, url: str) -> str:
     Returns:
         HTML content of the card-body div as a string
     """
-    page.goto(url)
-    page.wait_for_selector(".card-body", state="visible")
+    page.goto(url, wait_until="domcontentloaded")
+    # Wait for the card-body to be attached to DOM (not necessarily visible)
+    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    # Give it a moment to render
+    page.wait_for_timeout(1000)
 
     # Extract the HTML content of the card-body div
     card_body = page.locator(".card-body").first
@@ -114,8 +117,11 @@ def extract_card_body_text(page: Page, url: str) -> str:
     Returns:
         Clean plain text with structure preserved
     """
-    page.goto(url)
-    page.wait_for_selector(".card-body", state="visible")
+    page.goto(url, wait_until="domcontentloaded")
+    # Wait for the card-body to be attached to DOM (not necessarily visible)
+    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    # Give it a moment to render
+    page.wait_for_timeout(1000)
 
     # Extract clean text content (automatically handles HTML conversion)
     card_body = page.locator(".card-body").first
@@ -139,8 +145,11 @@ def extract_card_body_text_and_links(page: Page, url: str) -> tuple[str, list[st
         - text_content: Clean plain text with structure preserved
         - links: List of absolute URLs found in the card-body
     """
-    page.goto(url)
-    page.wait_for_selector(".card-body", state="visible")
+    page.goto(url, wait_until="domcontentloaded")
+    # Wait for the card-body to be attached to DOM (not necessarily visible)
+    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    # Give it a moment to render
+    page.wait_for_timeout(1000)
 
     card_body = page.locator(".card-body").first
 
@@ -179,8 +188,11 @@ def extract_links_from_card_body(page: Page, url: str) -> list[str]:
     Returns:
         List of absolute URLs found in the card-body
     """
-    page.goto(url)
-    page.wait_for_selector(".card-body", state="visible")
+    page.goto(url, wait_until="domcontentloaded")
+    # Wait for the card-body to be attached to DOM (not necessarily visible)
+    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    # Give it a moment to render
+    page.wait_for_timeout(1000)
 
     # Extract all links from the card-body
     card_body = page.locator(".card-body").first
