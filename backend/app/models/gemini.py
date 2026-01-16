@@ -9,7 +9,19 @@ from .models import Result
 # ============================================================================
 
 
-class GeminiGrantAnalysis(BaseModel):
+class GeminiPreliminaryAnalysis(BaseModel):
+    """
+    Schema for Gemini to return preliminary grant relevance rating.
+    """
+
+    rating: int = Field(
+        ge=0,
+        le=100,
+        description="Relevance rating of the grant to the organisation's mission and initiative (0-100)",
+    )
+
+
+class GeminiDeepAnalysis(BaseModel):
     """
     Schema for Gemini to return structured grant analysis.
     Note: grant_id, initiative_id, and prelim_rating are excluded from this schema
@@ -93,7 +105,7 @@ class GeminiBatchAnalysis(BaseModel):
     """
 
     initiative_id: int
-    analyses: list[GeminiGrantAnalysis]
+    analyses: list[GeminiDeepAnalysis]
 
 
 # ============================================================================
@@ -102,7 +114,7 @@ class GeminiBatchAnalysis(BaseModel):
 
 
 def gemini_to_sqlalchemy(
-    gemini_result: GeminiGrantAnalysis,
+    gemini_result: GeminiDeepAnalysis,
     grant_id: int,
     initiative_id: int,
     prelim_rating: int,
