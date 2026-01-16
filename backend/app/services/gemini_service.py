@@ -1,6 +1,5 @@
 """Service for interacting with Google Gemini API."""
 
-import os
 import time
 from pathlib import Path
 from typing import Any
@@ -8,18 +7,20 @@ from typing import Any
 from google import genai
 from google.genai import types
 
-from app.core.config import GEMINI_API_KEY
+from app.core.config import GEMINI_BILLING_TIER
 from app.models.gemini import GeminiDeepAnalysis, GeminiPreliminaryAnalysis
-
-# Set API key in environment for genai library
-os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
 
 client = genai.Client()
 
 GEMINI_MODEL = "gemini-3-flash-preview"
 
-# Rate limiting configuration (15 requests per minute for free tier)
-RATE_LIMIT_DELAY = 4.5  # seconds between requests (60/15 = 4, adding buffer)
+# Rate limiting configuration based on billing tier
+# FREE tier: 5 requests per minute
+# PAID tier: 15 requests per minute
+if GEMINI_BILLING_TIER == "FREE":
+    RATE_LIMIT_DELAY = 12.5  # seconds between requests (60/5 = 12, adding buffer)
+else:
+    RATE_LIMIT_DELAY = 4.5  # seconds between requests (60/15 = 4, adding buffer)
 
 
 def rate_limit_sleep():

@@ -423,9 +423,10 @@ GET /health
    
    # Gemini API
    GEMINI_API_KEY=your_gemini_api_key_here
+   GEMINI_BILLING_TIER=PAID  # FREE (5 req/min) or PAID (15 req/min), defaults to PAID
    
    # Logging (optional)
-   LOG_LEVEL=INFO
+   LOG_LEVEL=INFO # or DEBUG
    LOG_FILE=/path/to/logfile.log  # Optional file logging
    ```
 
