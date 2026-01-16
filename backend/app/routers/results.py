@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.access import ResultAccess, get_db
+from app.access import ResultAccess, get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/results", tags=["results"])
 
 
 @router.get("/{initiative_id}")
-async def get_results(initiative_id: int, db: Session = Depends(get_db)):
+async def get_results(initiative_id: int, db: Session = Depends(get_db_session)):
     """
     Get all results for an initiative.
 
