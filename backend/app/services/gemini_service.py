@@ -1,23 +1,29 @@
 """Service for interacting with Google Gemini API."""
 
 import os
+import time
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
 from google import genai
 
-from app.models.gemini import GeminiGrantAnalysis
+from app.core.config import GEMINI_API_KEY
+from app.models.gemini import GeminiDeepAnalysis, GeminiPreliminaryAnalysis
 
-load_dotenv()
+# Set API key in environment for genai library
+os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
 
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable is not set")
+client = genai.Client()
 
-if genai:
-    genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_MODEL = "gemini-3-flash-preview"
+
+# Rate limiting configuration (15 requests per minute for free tier)
+RATE_LIMIT_DELAY = 4.5  # seconds between requests (60/15 = 4, adding buffer)
+
+
+def rate_limit_sleep():
+    """Sleep to respect API rate limits."""
+    time.sleep(RATE_LIMIT_DELAY)
 
 
 def analyze_grant_preliminary(
@@ -36,43 +42,59 @@ def analyze_grant_preliminary(
     Returns:
         Preliminary rating (0-100)
     """
-    if not genai:
-        raise ImportError("google-generativeai is not installed")
 
-    model = genai.GenerativeModel("gemini-1.5-pro")
+    prompt = f"""Review this grant information against the following organisation and initiative:
 
-    prompt = f"""
-You are analyzing grants to match them with initiatives. Given the following information:
+ORGANISATION CONTEXT:
+Name: {org_info.get("name", "N/A")}
+Mission and Focus: {org_info.get("mission_and_focus", "N/A")}
+About Us: {org_info.get("about_us", "N/A")}
+{f"Additional Remarks: {org_info.get('remarks')}" if org_info.get("remarks") else ""}
 
-ORGANIZATION:
-{org_info.get("name", "N/A")}
-Mission: {org_info.get("mission_and_focus", "N/A")}
-About: {org_info.get("about_us", "N/A")}
-
-INITIATIVE:
+INITIATIVE DETAILS:
 Title: {initiative_info.get("title", "N/A")}
 Goals: {initiative_info.get("goals", "N/A")}
-Audience: {initiative_info.get("audience", "N/A")}
-Costs: {initiative_info.get("costs", "N/A")}
+Target Audience: {initiative_info.get("audience", "N/A")}
 Stage: {initiative_info.get("stage", "N/A")}
+Budget: ${initiative_info.get("costs") or 0:,}
+{f"Demographic: {initiative_info.get('demographic')}" if initiative_info.get("demographic") else ""}
+{f"Remarks: {initiative_info.get('remarks')}" if initiative_info.get("remarks") else ""}
 
-GRANT:
+GRANT INFORMATION:
 Name: {grant_info.get("name", "N/A")}
 URL: {grant_info.get("url", "N/A")}
 Details:
 {grant_info.get("card_body_text", grant_info.get("details", "N/A"))}
 
-Based on the grant information, provide a preliminary match rating from 0-100.
-This should be a quick assessment of how well the grant might match the initiative.
-Return ONLY the integer rating (0-100), nothing else.
-"""
+Rate the relevance of this grant to the organisation's mission and this specific initiative on a scale of 0-100, where:
+- 0-20: Not relevant at all
+- 21-40: Slightly relevant
+- 41-60: Moderately relevant
+- 61-80: Highly relevant
+- 81-100: Extremely relevant
+
+Consider:
+- Alignment with the organisation's overall mission and focus
+- Fit with the initiative's specific goals and audience
+- Appropriateness for the initiative's stage and budget
+- Match with target demographic
+
+Return ONLY the integer rating (0-100), nothing else."""
 
     try:
-        response = model.generate_content(prompt)
-        rating_text = response.text.strip()
-        # Extract number from response
-        rating = int("".join(filter(str.isdigit, rating_text))[:3])
-        return min(100, max(0, rating))
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": GeminiPreliminaryAnalysis.model_json_schema(),
+            },
+        )
+        rate_limit_sleep()  # Rate limit after API call
+
+        # Parse the structured JSON response
+        analysis = GeminiPreliminaryAnalysis.model_validate_json(response.text)
+        return analysis.rating
     except Exception as e:
         print(f"Error in preliminary analysis: {e}")
         return 50  # Default rating
@@ -83,7 +105,7 @@ def analyze_grant_detailed(
     org_info: dict[str, Any],
     initiative_info: dict[str, Any],
     file_paths: list[Path] | None = None,
-) -> GeminiGrantAnalysis:
+) -> GeminiDeepAnalysis:
     """
     Phase 2: Detailed analysis of grant with files, returning structured output.
 
@@ -94,35 +116,26 @@ def analyze_grant_detailed(
         file_paths: List of paths to PDF/text files to analyze
 
     Returns:
-        GeminiGrantAnalysis with structured results
+        GeminiDeepAnalysis with structured results
     """
-    if not genai:
-        raise ImportError("google-generativeai is not installed")
-
-    model = genai.GenerativeModel(
-        "gemini-1.5-pro",
-        generation_config={
-            "response_mime_type": "application/json",
-            "response_schema": GeminiGrantAnalysis,
-        },
-    )
 
     # Build content for analysis
-    text_content = f"""
-ORGANIZATION:
+    text_content = f"""Analyze these comprehensive grant documents in detail for the following organisation and initiative:
+
+ORGANISATION CONTEXT:
 Name: {org_info.get("name", "N/A")}
 Mission and Focus: {org_info.get("mission_and_focus", "N/A")}
 About Us: {org_info.get("about_us", "N/A")}
-Remarks: {org_info.get("remarks", "N/A")}
+{f"Additional Remarks: {org_info.get('remarks')}" if org_info.get("remarks") else ""}
 
-INITIATIVE:
+INITIATIVE DETAILS:
 Title: {initiative_info.get("title", "N/A")}
 Goals: {initiative_info.get("goals", "N/A")}
-Audience: {initiative_info.get("audience", "N/A")}
-Estimated Costs: {initiative_info.get("costs", "N/A")}
+Target Audience: {initiative_info.get("audience", "N/A")}
 Stage: {initiative_info.get("stage", "N/A")}
-Demographic: {initiative_info.get("demographic", "N/A")}
-Remarks: {initiative_info.get("remarks", "N/A")}
+Budget: ${initiative_info.get("costs") or 0:,}
+{f"Demographic: {initiative_info.get('demographic')}" if initiative_info.get("demographic") else ""}
+{f"Remarks: {initiative_info.get('remarks')}" if initiative_info.get("remarks") else ""}
 
 GRANT BASIC INFORMATION:
 Name: {grant_info.get("name", "N/A")}
@@ -143,36 +156,43 @@ Basic Details:
                 # Note: DOCX should be converted to PDF before calling this
 
     prompt = """
-Analyze this grant in detail and provide a comprehensive match assessment with the initiative.
+Analyze this grant in detail and extract the following information:
 
-Provide:
-1. A concise grant description
-2. Eligibility criteria (as a list)
-3. Grant amount information
-4. Match rating (0-100) - how well the grant matches the initiative
-5. Uncertainty rating (0-100) - how much information is missing or unclear
-6. Application deadline if available
-7. Source URLs for verification
-8. Sponsor name - the name of the organization or entity sponsoring the grant
-9. Sponsor description - description of the sponsor organization, its mission, and background
-10. Detailed explanations for both ratings
+1. Grant Description: Brief summary (2-3 sentences) of what the grant funds and who it targets
+2. Eligibility Criteria: List all eligibility requirements found in the documents
+3. Grant Amount: Funding amount or range (e.g., '$50,000 - $100,000' or 'Up to $250,000')
+4. Match Rating: 0-100 score for overall match quality considering both organisation mission and initiative specifics
+5. Uncertainty Rating: 0-100 score for confidence (higher = more uncertain/missing information)
+6. Deadline: Application deadline if available
+7. Sources: Where you found key information (page numbers, section names, or URLs)
+8. Match Rating Explanation: Detailed explanation of how grant aligns with organisation mission and initiative goals
+9. Uncertainty Rating Explanation: Explanation of what information is missing or unclear
+10. Sponsor Name: Name of the organization or entity sponsoring the grant
+11. Sponsor Description: Description of the sponsor organization, its mission, and background
 
-Return the analysis in the structured JSON format.
+Consider both the organisation's broader mission AND the specific initiative's needs when rating.
 """
 
     parts.append(prompt)
 
     try:
-        response = model.generate_content(parts)
-        # Parse JSON response
-        import json
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=parts,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": GeminiDeepAnalysis.model_json_schema(),
+            },
+        )
+        rate_limit_sleep()  # Rate limit after API call
 
-        result_dict = json.loads(response.text)
-        return GeminiGrantAnalysis(**result_dict)
+        # Parse the structured JSON response
+        analysis = GeminiDeepAnalysis.model_validate_json(response.text)
+        return analysis
     except Exception as e:
         print(f"Error in detailed analysis: {e}")
         # Return a default analysis on error
-        return GeminiGrantAnalysis(
+        return GeminiDeepAnalysis(
             grant_description="Analysis error occurred",
             criteria=[],
             grant_amount="Unknown",

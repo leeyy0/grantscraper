@@ -6,7 +6,6 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
-    String,
     Text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -23,13 +22,13 @@ class Grant(Base):
     __tablename__ = "grants"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=True)  # Can be derived from button_text
-    url = Column(String, nullable=False)
+    name = Column(Text, nullable=True)  # Can be derived from button_text
+    url = Column(Text, nullable=False)
     details = Column(Text, nullable=True)  # Legacy field, can store card_body_text/html
-    button_text = Column(String, nullable=True)  # Button text from listing page
+    button_text = Column(Text, nullable=True)  # Button text from listing page
     card_body_text = Column(Text, nullable=True)  # Clean text content (for LLM)
     card_body_html = Column(Text, nullable=True)  # HTML content (if use_text=False)
-    links = Column(ARRAY(String), nullable=True)  # URLs found in card-body
+    links = Column(ARRAY(Text), nullable=True)  # URLs found in card-body
 
     # Relationships
     results = relationship("Result", back_populates="grant")
@@ -72,7 +71,7 @@ class Organisation(Base):
     __tablename__ = "organisations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String, nullable=False)
+    name = Column(Text, nullable=False)
     mission_and_focus = Column(Text, nullable=False)
     about_us = Column(Text, nullable=False)
     remarks = Column(Text, nullable=True)
@@ -86,12 +85,12 @@ class Initiative(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     organisation_id = Column(Integer, ForeignKey("organisations.id"), nullable=False)
-    title = Column(String, nullable=False)
+    title = Column(Text, nullable=False)
     goals = Column(Text, nullable=False)  # Objective of the initiative
-    audience = Column(String, nullable=False)  # Target beneficiaries
-    costs = Column(BigInteger, nullable=False)  # Estimated cost
-    stage = Column(String, nullable=False)  # e.g., "concept", "expansion", "scaling"
-    demographic = Column(String, nullable=True)  # Demographic of the team
+    audience = Column(Text, nullable=False)  # Target beneficiaries
+    costs = Column(BigInteger, nullable=True)  # Estimated cost
+    stage = Column(Text, nullable=False)  # e.g., "concept", "expansion", "scaling"
+    demographic = Column(Text, nullable=True)  # Demographic of the team
     remarks = Column(Text, nullable=True)
 
     # Relationships
@@ -109,15 +108,15 @@ class Result(Base):
     # Ratings & Analysis
     prelim_rating = Column(Integer, nullable=False)  # Out of 100
     grant_description = Column(Text, nullable=True)  # Summary of the grant
-    criteria = Column(ARRAY(String), nullable=True)  # Eligibility criteria
+    criteria = Column(ARRAY(Text), nullable=True)  # Eligibility criteria
     grant_amount = Column(
-        String, nullable=True
+        Text, nullable=True
     )  # Amount awarded (string for flexibility)
     match_rating = Column(Integer, nullable=True)  # Percentage (0-100)
     uncertainty_rating = Column(Integer, nullable=True)  # Percentage (0-100)
     deadline = Column(DateTime, nullable=True)  # Grant deadline
-    sources = Column(ARRAY(String), nullable=True)  # URL links to grants
-    sponsor_name = Column(String, nullable=True)  # Name of the grant sponsor
+    sources = Column(ARRAY(Text), nullable=True)  # URL links to grants
+    sponsor_name = Column(Text, nullable=True)  # Name of the grant sponsor
     sponsor_description = Column(Text, nullable=True)  # Description of the sponsor
 
     # Explanations as JSON

@@ -10,3 +10,8 @@
    # macOS
    brew install libreoffice```
    
+# To autogenerate migrations using alembic:
+`alembic revision --autogenerate -m "<WRITE MIGRATION DESCRIPTION HERE>"`
+
+# To apply the migrations:
+`alembic upgrade head`

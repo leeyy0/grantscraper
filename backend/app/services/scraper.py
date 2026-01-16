@@ -273,10 +273,39 @@ def get_grant_details_as_models(
     Returns:
         List of Grant SQLAlchemy model instances (not yet persisted to database)
     """
-    from models.models import Grant
+    from app.models.models import Grant
 
     grant_dicts = get_grant_details(page, grant_links, use_text=use_text)
     return [Grant.from_scraper_dict(grant_dict) for grant_dict in grant_dicts]
+
+
+def save_grants_to_db(
+    page: Page, grant_links: list[dict[str, str]], use_text: bool = True
+) -> list["Grant"]:
+    """Scrape grant details and save them to the database.
+
+    This function performs Step 2 of the ingestion pipeline:
+    - Scrapes grant details from URLs
+    - Saves or updates grants in the database (matched by URL)
+
+    Args:
+        page: Playwright page object
+        grant_links: List of grant link dictionaries with 'url' and 'button_text'
+        use_text: If True, extract clean text (recommended for LLM). If False, extract HTML.
+
+    Returns:
+        List of saved Grant SQLAlchemy model instances
+    """
+    from app.access import GrantAccess, get_db_session
+
+    # Get grant details as model instances
+    grant_models = get_grant_details_as_models(page, grant_links, use_text=use_text)
+
+    # Save to database (create or update by URL)
+    with get_db_session() as db:
+        saved_grants = GrantAccess.create_or_update_many_by_url(db, grant_models)
+
+    return saved_grants
 
 
 # Screenshot directory - ensure screenshots go to backend/.private/screenshots
