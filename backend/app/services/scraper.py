@@ -331,7 +331,10 @@ SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def scrape_and_refresh_grants(
-    take_screenshots: bool = False, headless: bool = True, save_to_db: bool = True
+    take_screenshots: bool = False,
+    headless: bool = True,
+    save_to_db: bool = True,
+    job_id: str | None = None,
 ) -> dict:
     """
     Scrape open grants from the website and optionally save to database.
@@ -347,6 +350,7 @@ def scrape_and_refresh_grants(
         take_screenshots: Whether to save screenshots during scraping
         headless: Whether to run browser in headless mode
         save_to_db: Whether to save grants to database
+        job_id: Optional job ID for status tracking
 
     Returns:
         Dictionary with:
@@ -360,6 +364,14 @@ def scrape_and_refresh_grants(
     errors = []
     grant_urls = []
 
+    # Import status tracking if job_id provided
+    if job_id:
+        from app.services.refresh_status import RefreshPhase, update_refresh_status
+
+        update_refresh_status(
+            job_id, RefreshPhase.STARTING, message="Initializing browser"
+        )
+
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=headless)
@@ -367,6 +379,10 @@ def scrape_and_refresh_grants(
 
             # Navigate to grants page
             logger.info("Navigating to grants listing page...")
+            if job_id:
+                update_refresh_status(
+                    job_id, RefreshPhase.NAVIGATING, message="Navigating to grants page"
+                )
             page.goto("https://oursggrants.gov.sg/grants/new")
             logger.info(f"Page loaded: {page.title()}")
 
@@ -420,12 +436,26 @@ def scrape_and_refresh_grants(
 
             # Extract links for grants that are not closed
             logger.info("Extracting grant links...")
+            if job_id:
+                update_refresh_status(
+                    job_id,
+                    RefreshPhase.EXTRACTING_LINKS,
+                    message="Extracting grant links",
+                )
             grant_links = get_links(page)
             logger.info(f"Found {len(grant_links)} open grant(s)")
 
             for grant in grant_links:
                 logger.info(f"  - {grant['button_text']}: {grant['url']}")
                 grant_urls.append(grant["url"])
+
+            if job_id:
+                update_refresh_status(
+                    job_id,
+                    RefreshPhase.SCRAPING_DETAILS,
+                    total_found=len(grant_links),
+                    message=f"Found {len(grant_links)} grants, starting detailed scraping",
+                )
 
             if take_screenshots:
                 page.screenshot(
@@ -439,6 +469,13 @@ def scrape_and_refresh_grants(
             grants_saved = 0
             if save_to_db and grant_links:
                 logger.info("Saving grants to database...")
+                if job_id:
+                    update_refresh_status(
+                        job_id,
+                        RefreshPhase.SAVING_TO_DB,
+                        total_found=len(grant_links),
+                        message="Saving grants to database",
+                    )
                 try:
                     saved_grants = save_grants_to_db(page, grant_links, use_text=True)
                     grants_saved = len(saved_grants)
@@ -451,17 +488,32 @@ def scrape_and_refresh_grants(
             browser.close()
             logger.info("Scraping completed successfully")
 
-            return {
+            result = {
                 "total_found": len(grant_links),
                 "grants_saved": grants_saved,
                 "grant_urls": grant_urls,
                 "errors": errors,
             }
 
+            # Update final status
+            if job_id:
+                from app.services.refresh_status import complete_refresh
+
+                complete_refresh(
+                    job_id, len(grant_links), grants_saved, grant_urls, errors
+                )
+
+            return result
+
     except Exception as e:
         error_msg = f"Error during scraping: {e}"
         logger.error(error_msg, exc_info=True)
         errors.append(error_msg)
+
+        # Update error status
+        if job_id:
+            update_refresh_status(job_id, RefreshPhase.ERROR, error=error_msg)
+
         return {
             "total_found": 0,
             "grants_saved": 0,

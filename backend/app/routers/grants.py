@@ -5,6 +5,11 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from app.services.refresh_status import (
+    RefreshPhase,
+    create_job_id,
+    get_refresh_status,
+)
 from app.services.scraper import scrape_and_refresh_grants
 
 logger = logging.getLogger(__name__)
@@ -19,9 +24,12 @@ async def refresh_grants(
     take_screenshots: bool = False,
 ):
     """
-    Refresh the grants database by scraping the latest open grants.
+    Start a grant refresh job to scrape the latest open grants.
 
-    This endpoint:
+    This endpoint returns immediately with a job_id. Use the /refresh-status
+    endpoint to check the progress of the scraping operation.
+
+    The scraper:
     1. Scrapes the grants listing page for open grants
     2. Filters out closed grants automatically
     3. Extracts detailed information from each grant page
@@ -36,57 +44,76 @@ async def refresh_grants(
         take_screenshots: Save debug screenshots during scraping (default: False)
 
     Returns:
-        Summary of the refresh operation including:
-        - total_found: Number of open grants found
-        - grants_saved: Number of grants saved/updated in database
-        - grant_urls: List of processed grant URLs
-        - errors: Any errors encountered
+        Job information including:
+        - job_id: Unique identifier to track this refresh operation
+        - message: Confirmation message
+        - status_endpoint: URL to check job status
     """
+    # Create unique job ID
+    job_id = create_job_id()
+
     logger.info(
-        f"Starting grant refresh process (headless={headless}, "
+        f"Starting grant refresh job {job_id} (headless={headless}, "
         f"screenshots={take_screenshots})"
     )
 
-    try:
-        # Run scraping in a background thread to avoid blocking
-        logger.info("Launching scraper in background thread...")
-        result = await asyncio.to_thread(
+    # Start scraping in background - fire and forget
+    asyncio.create_task(
+        asyncio.to_thread(
             scrape_and_refresh_grants,
             take_screenshots=take_screenshots,
             headless=headless,
             save_to_db=True,
+            job_id=job_id,
         )
+    )
 
-        logger.info(
-            f"Scraper completed. Found: {result['total_found']}, "
-            f"Saved: {result['grants_saved']}, Errors: {len(result['errors'])}"
-        )
+    logger.info(f"Grant refresh job {job_id} started in background")
 
-        if result["errors"]:
-            logger.warning(
-                f"Grant refresh completed with {len(result['errors'])} error(s): "
-                f"{result['errors']}"
-            )
-            return {
-                "status": "completed_with_errors",
-                "message": "Grant refresh completed but encountered some errors",
-                **result,
-            }
+    return {
+        "job_id": job_id,
+        "message": "Grant refresh job started",
+        "status_endpoint": f"/grants/refresh-status/{job_id}",
+    }
 
-        logger.info(
-            f"Grant refresh completed successfully. "
-            f"Found {result['total_found']} grants, saved {result['grants_saved']} to database."
-        )
 
-        return {
-            "status": "success",
-            "message": f"Successfully refreshed {result['grants_saved']} grants",
-            **result,
-        }
+@router.get("/refresh-status/{job_id}")
+async def get_refresh_status_endpoint(job_id: str):
+    """
+    Get the status of a grant refresh job.
 
-    except Exception as e:
-        logger.error(f"Error during grant refresh: {e}", exc_info=True)
+    Args:
+        job_id: The job ID returned from the /refresh endpoint
+
+    Returns:
+        Current status of the refresh job including:
+        - job_id: The job identifier
+        - phase: Current phase (starting, navigating, extracting_links, etc.)
+        - total_found: Number of grants found (when available)
+        - current_grant: Current grant being processed (when available)
+        - grants_saved: Number of grants saved to database (when available)
+        - message: Human-readable status message
+        - error: Error message if operation failed
+    """
+    logger.debug(f"Status check for refresh job {job_id}")
+
+    status = get_refresh_status(job_id)
+
+    if not status:
+        logger.warning(f"No status found for job {job_id}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to refresh grants: {str(e)}",
+            status_code=404,
+            detail=f"Refresh job {job_id} not found. It may have expired or never existed.",
         )
+
+    phase = status.get("phase")
+
+    # Log completion or errors
+    if phase == RefreshPhase.COMPLETED.value:
+        logger.info(
+            f"Refresh job {job_id} completed: {status.get('grants_saved')} grants saved"
+        )
+    elif phase == RefreshPhase.ERROR.value:
+        logger.warning(f"Refresh job {job_id} failed: {status.get('error')}")
+
+    return status

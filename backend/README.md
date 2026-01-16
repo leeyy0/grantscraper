@@ -203,9 +203,9 @@ Routes for scraping and managing grant data.
 
 ---
 
-#### 4. Refresh Grants
+#### 4. Start Grant Refresh
 
-Scrape the latest open grants from the government portal and update the database.
+Start a background job to scrape the latest open grants from the government portal.
 
 ```http
 POST /grants/refresh
@@ -220,34 +220,82 @@ POST /grants/refresh
 POST /grants/refresh?headless=true&take_screenshots=false
 ```
 
-**Response (Success):**
+**Response (Job Started):**
 ```json
 {
-  "status": "success",
-  "message": "Successfully refreshed 15 grants",
+  "job_id": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+  "message": "Grant refresh job started",
+  "status_endpoint": "/grants/refresh-status/a1b2c3d4-5678-90ab-cdef-1234567890ab"
+}
+```
+
+**Process:**
+1. Returns immediately with a unique `job_id`
+2. Scraping runs in background (~1 minute)
+3. Use the `job_id` to check status
+
+**Note:** This endpoint returns immediately. The actual scraping happens asynchronously. Use the refresh status endpoint to monitor progress.
+
+---
+
+#### 5. Get Grant Refresh Status
+
+Check the status of a grant refresh job.
+
+```http
+GET /grants/refresh-status/{job_id}
+```
+
+**Parameters:**
+- `job_id` (path, required): The job ID returned from `/grants/refresh`
+
+**Response (In Progress):**
+```json
+{
+  "job_id": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+  "phase": "scraping_details",
+  "total_found": 15,
+  "message": "Found 15 grants, starting detailed scraping",
+  "updated_at": "2024-01-15T10:23:45.123456"
+}
+```
+
+**Response (Completed):**
+```json
+{
+  "job_id": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+  "phase": "completed",
   "total_found": 15,
   "grants_saved": 15,
   "grant_urls": [
     "https://oursggrants.gov.sg/grants/...",
     "..."
   ],
-  "errors": []
+  "errors": [],
+  "completed_at": "2024-01-15T10:24:30.123456"
 }
 ```
 
-**Response (Partial Success):**
+**Response (Error):**
 ```json
 {
-  "status": "completed_with_errors",
-  "message": "Grant refresh completed but encountered some errors",
-  "total_found": 15,
-  "grants_saved": 13,
-  "grant_urls": ["..."],
-  "errors": ["Error message 1", "Error message 2"]
+  "job_id": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+  "phase": "error",
+  "error": "Error message here",
+  "updated_at": "2024-01-15T10:23:50.123456"
 }
 ```
 
-**Process:**
+**Phase Values:**
+- `starting`: Initializing browser
+- `navigating`: Loading grants page
+- `extracting_links`: Finding open grants
+- `scraping_details`: Extracting grant details
+- `saving_to_db`: Saving to database
+- `completed`: Job finished successfully
+- `error`: Job failed
+
+**Scraping Process:**
 1. Navigate to grants listing page
 2. Apply "Organisation" filter
 3. Extract links for open grants (automatically filters out closed grants)
@@ -268,7 +316,7 @@ Routes for retrieving grant analysis results.
 
 ---
 
-#### 5. Get Results
+#### 6. Get Results
 
 Retrieve all grant analysis results for an initiative.
 
@@ -458,7 +506,12 @@ LOG_FILE=/var/log/grantscraper/api.log
 
 1. **Refresh grants** (do this first or periodically):
    ```bash
+   # Start refresh job
    curl -X POST "http://localhost:8000/grants/refresh"
+   # Response: {"job_id": "abc-123", ...}
+   
+   # Check status (poll until completed)
+   curl "http://localhost:8000/grants/refresh-status/abc-123"
    ```
 
 2. **Create organizations and initiatives** (via database or separate endpoints)
@@ -468,15 +521,42 @@ LOG_FILE=/var/log/grantscraper/api.log
    curl -X POST "http://localhost:8000/pipeline/filter-grants/123?threshold=60"
    ```
 
-4. **Monitor progress**:
+4. **Monitor pipeline progress**:
    ```bash
    curl "http://localhost:8000/pipeline/get-status?initiative_id=123"
    ```
 
-5. **Get results**:
+5. **Get results when pipeline completes**:
    ```bash
    curl "http://localhost:8000/results/123"
    ```
+
+### Real-World Example with Async Operations
+
+```bash
+# 1. Start grant refresh (returns immediately)
+REFRESH_RESPONSE=$(curl -X POST "http://localhost:8000/grants/refresh")
+JOB_ID=$(echo $REFRESH_RESPONSE | jq -r '.job_id')
+
+# 2. Poll for completion
+while true; do
+  STATUS=$(curl "http://localhost:8000/grants/refresh-status/$JOB_ID" | jq -r '.phase')
+  echo "Refresh status: $STATUS"
+  if [ "$STATUS" = "completed" ] || [ "$STATUS" = "error" ]; then
+    break
+  fi
+  sleep 5
+done
+
+# 3. Start filtering pipeline
+curl -X POST "http://localhost:8000/pipeline/filter-grants/123"
+
+# 4. Monitor pipeline (use SSE for real-time updates)
+curl -N "http://localhost:8000/pipeline/get-status-stream/123"
+
+# 5. Get final results
+curl "http://localhost:8000/results/123"
+```
 
 ---
 
