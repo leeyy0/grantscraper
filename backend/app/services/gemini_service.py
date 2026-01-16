@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from google import genai
+from google.genai import types
 
 from app.core.config import GEMINI_API_KEY
 from app.models.gemini import GeminiDeepAnalysis, GeminiPreliminaryAnalysis
@@ -149,9 +150,23 @@ Basic Details:
     if file_paths:
         for file_path in file_paths:
             if file_path.exists():
+                file_size_mb = file_path.stat().st_size / (1024 * 1024)
+
                 if file_path.suffix.lower() == ".pdf":
-                    parts.append(genai.upload_file(str(file_path)))
+                    # Use inline data for PDFs under 50MB (recommended by Gemini API docs)
+                    # For larger files, use File API upload
+                    if file_size_mb <= 50:
+                        parts.append(
+                            types.Part.from_bytes(
+                                data=file_path.read_bytes(),
+                                mime_type="application/pdf",
+                            )
+                        )
+                    else:
+                        # Fall back to File API upload for large files
+                        parts.append(genai.upload_file(str(file_path)))
                 elif file_path.suffix.lower() in [".txt", ".md"]:
+                    # Text files are read directly (inline data)
                     parts.append(file_path.read_text(encoding="utf-8"))
                 # Note: DOCX should be converted to PDF before calling this
 
