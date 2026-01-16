@@ -1,20 +1,15 @@
-"""Router for grant filtering pipeline endpoints."""
+"""Service for running the grant filtering pipeline."""
 
-import asyncio
-import json
+import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from playwright.sync_api import sync_playwright
-from sqlalchemy.orm import Session
 
 from app.access import (
     GrantAccess,
     InitiativeAccess,
     OrganisationAccess,
     ResultAccess,
-    get_db,
     get_db_session,
 )
 from app.models.gemini import gemini_to_sqlalchemy
@@ -25,18 +20,12 @@ from app.services.gemini_service import (
     analyze_grant_detailed,
     analyze_grant_preliminary,
 )
-from app.services.pipeline_status import (
-    PipelinePhase,
-    clear_status,
-    get_status,
-    update_status,
-)
+from app.services.pipeline_status import PipelinePhase, update_status
 
-# Create router
-router = APIRouter(tags=["grant-filtering"])
+logger = logging.getLogger(__name__)
 
 # File structure paths
-BASE_DIR = Path(__file__).parent.parent.parent.parent
+BASE_DIR = Path(__file__).parent.parent.parent
 DOWNLOADS_DIR = BASE_DIR / "downloads"
 INITIAL_SCRAPE_DIR = DOWNLOADS_DIR / "initial_scrape"
 DEEP_SCRAPE_DIR = DOWNLOADS_DIR / "deep_scrape"
@@ -60,27 +49,42 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
     3. Phase 1: Calculate preliminary ratings (Step 4)
     4. Phase 2: Deep scrape and analyze grants above threshold (Steps 5-7)
     5. Save results to DB
+
+    Args:
+        initiative_id: ID of the initiative to filter grants for
+        threshold: Minimum preliminary rating for deep analysis (default: 50)
     """
+    logger.info(
+        f"Starting pipeline for initiative {initiative_id} with threshold {threshold}"
+    )
+
     try:
         with get_db_session() as db:
             # Step 1: Read initiative and organization (Step 3 from requirements)
+            logger.info(f"Loading initiative {initiative_id} and organization...")
             initiative = InitiativeAccess.get_by_id(db, initiative_id)
             if not initiative:
+                error_msg = f"Initiative {initiative_id} not found"
+                logger.error(error_msg)
                 update_status(
                     initiative_id,
                     PipelinePhase.ERROR,
-                    error=f"Initiative {initiative_id} not found",
+                    error=error_msg,
                 )
                 return
 
             org = OrganisationAccess.get_by_id(db, initiative.organisation_id)
             if not org:
+                error_msg = f"Organization for initiative {initiative_id} not found"
+                logger.error(error_msg)
                 update_status(
                     initiative_id,
                     PipelinePhase.ERROR,
-                    error=f"Organization for initiative {initiative_id} not found",
+                    error=error_msg,
                 )
                 return
+
+            logger.info(f"Loaded organization: {org.name}")
 
             # Convert to dicts for easier handling
             org_info = {
@@ -103,18 +107,24 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
             }
 
             # Step 2: Get all grants
+            logger.info("Loading all grants from database...")
             grants = GrantAccess.get_all(db)
             if not grants:
+                error_msg = "No grants found in database"
+                logger.error(error_msg)
                 update_status(
                     initiative_id,
                     PipelinePhase.ERROR,
-                    error="No grants found in database",
+                    error=error_msg,
                 )
                 return
 
-            print(f"Processing {len(grants)} grants for initiative {initiative_id}")
+            logger.info(
+                f"Processing {len(grants)} grants for initiative {initiative_id}"
+            )
 
             # Step 3: Phase 1 - Preliminary ratings (Step 4 from requirements)
+            logger.info("Phase 1: Starting preliminary rating calculations...")
             update_status(
                 initiative_id,
                 PipelinePhase.PHASE_1_CALCULATING,
@@ -130,10 +140,16 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     "details": grant.details,
                 }
 
+                logger.debug(
+                    f"Calculating preliminary rating for grant {grant.id}: {grant.name}"
+                )
+
                 # Calculate preliminary rating
                 prelim_rating = analyze_grant_preliminary(
                     grant_info, org_info, initiative_info
                 )
+
+                logger.debug(f"Grant {grant.id} preliminary rating: {prelim_rating}")
 
                 # Save or update Result with preliminary rating
                 result = ResultAccess.get_by_ids(db, grant.id, initiative_id)
@@ -156,7 +172,10 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     remaining_calls=len(grants) - idx - 1,
                 )
 
+            logger.info("Phase 1 completed: All preliminary ratings calculated")
+
             # Step 4: Filter grants above threshold
+            logger.info(f"Filtering grants above threshold {threshold}...")
             filtered_results = ResultAccess.get_filtered_by_rating(
                 db, initiative_id, threshold
             )
@@ -164,9 +183,12 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
             filtered_grant_ids = [r.grant_id for r in filtered_results]
             filtered_grants = GrantAccess.get_by_ids(db, filtered_grant_ids)
 
-            print(f"Found {len(filtered_grants)} grants above threshold {threshold}")
+            logger.info(
+                f"Found {len(filtered_grants)} grants above threshold {threshold}"
+            )
 
             if not filtered_grants:
+                logger.info("No grants above threshold. Pipeline completed.")
                 update_status(
                     initiative_id,
                     PipelinePhase.COMPLETED,
@@ -176,6 +198,7 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                 return
 
             # Step 5: Phase 2 - Deep scraping (Step 5 from requirements)
+            logger.info("Phase 2: Starting deep scraping...")
             update_status(
                 initiative_id,
                 PipelinePhase.PHASE_2_DEEP_SCRAPING,
@@ -200,11 +223,15 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     )
 
                 # Deep scrape
+                logger.info(f"Deep scraping {len(grant_dicts)} grants (max_depth=2)...")
                 deep_scraped = deep_scrape_grants(page, grant_dicts, max_depth=2)
 
                 browser.close()
 
+            logger.info("Phase 2: Deep scraping completed")
+
             # Step 6: Download files and analyze with Gemini (Steps 6-7 from requirements)
+            logger.info("Phase 2: Starting detailed analysis with Gemini...")
             update_status(
                 initiative_id,
                 PipelinePhase.PHASE_2_ANALYZING,
@@ -219,6 +246,11 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                 for idx, (grant, deep_data) in enumerate(
                     zip(filtered_grants, deep_scraped)
                 ):
+                    logger.info(
+                        f"Analyzing grant {idx + 1}/{len(filtered_grants)}: "
+                        f"{grant.name} (ID: {grant.id})"
+                    )
+
                     # Download files to deep_scrape/grant_{id}/ directory
                     grant_dir = DEEP_SCRAPE_DIR / f"grant_{grant.id}"
                     grant_dir.mkdir(parents=True, exist_ok=True)
@@ -229,10 +261,16 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     for nested in deep_data.get("deep_content", []):
                         all_links.extend(nested.get("links", []))
 
+                    logger.debug(
+                        f"Downloading {len(all_links)} files for grant {grant.id}..."
+                    )
+
                     # Download files (converts docx to pdf automatically)
                     downloaded_files = download_files_from_links(
                         page, all_links, grant_dir, grant.id
                     )
+
+                    logger.debug(f"Downloaded {len(downloaded_files)} files")
 
                     # Prepare grant info
                     grant_info = {
@@ -246,6 +284,10 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     # Get preliminary rating
                     result = ResultAccess.get_by_ids(db, grant.id, initiative_id)
                     prelim_rating = result.prelim_rating if result else 50
+
+                    logger.debug(
+                        f"Sending grant {grant.id} to Gemini for detailed analysis..."
+                    )
 
                     # Analyze with Gemini (with files)
                     gemini_result = analyze_grant_detailed(
@@ -263,6 +305,12 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     # Update or create result
                     ResultAccess.create_or_update(db, result_obj)
 
+                    logger.info(
+                        f"Completed analysis for grant {grant.id}: "
+                        f"Match Rating: {result_obj.match_rating}%, "
+                        f"Uncertainty: {result_obj.uncertainty_rating}%"
+                    )
+
                     # Update status (return index of grant + 1 as per requirements)
                     update_status(
                         initiative_id,
@@ -275,6 +323,10 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                 browser.close()
 
             # Step 7: Mark as completed
+            logger.info(
+                f"Pipeline completed successfully for initiative {initiative_id}. "
+                f"Processed {len(grants)} total grants, analyzed {len(filtered_grants)} in detail."
+            )
             update_status(
                 initiative_id,
                 PipelinePhase.COMPLETED,
@@ -283,7 +335,9 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
             )
 
     except Exception as e:
-        print(f"Error in pipeline: {e}")
+        logger.error(
+            f"Error in pipeline for initiative {initiative_id}: {e}", exc_info=True
+        )
         import traceback
 
         traceback.print_exc()
@@ -292,165 +346,3 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
             PipelinePhase.ERROR,
             error=str(e),
         )
-
-
-@router.get("/filter-grants/{initiative_id}")
-async def filter_grants(initiative_id: int, threshold: int = RATING_THRESHOLD):
-    """
-    Trigger the grant filtering pipeline for an initiative.
-
-    This endpoint starts the pipeline asynchronously and returns immediately.
-    Use /get-status to check progress.
-
-    Args:
-        initiative_id: ID of the initiative to filter grants for
-        threshold: Minimum preliminary rating to include in deep analysis (default: 50)
-    """
-    # Check if initiative exists
-    with get_db_session() as db:
-        initiative = InitiativeAccess.get_by_id(db, initiative_id)
-        if not initiative:
-            raise HTTPException(status_code=404, detail="Initiative not found")
-
-    # Clear any existing status
-    clear_status(initiative_id)
-
-    # Start pipeline in background
-    asyncio.create_task(asyncio.to_thread(run_pipeline, initiative_id, threshold))
-
-    return {
-        "message": "Pipeline started",
-        "initiative_id": initiative_id,
-        "status_endpoint": "/get-status",
-    }
-
-
-@router.get("/get-status")
-async def get_pipeline_status(initiative_id: int):
-    """
-    Get the current status of the pipeline for an initiative.
-
-    Returns:
-        - "calculating" during Phase 1 with remaining_calls
-        - "deep_scraping" during Phase 2 scraping with total_grants (preliminaryFilteredGrants.length)
-        - "analyzing" during Phase 2 analysis with current_grant and remaining_calls
-        - "completed" when done
-        - "error" if there was an error
-    """
-    status = get_status(initiative_id)
-
-    if not status:
-        return {
-            "status": "idle",
-            "message": "No pipeline running for this initiative",
-        }
-
-    phase = status.get("phase", "idle")
-    remaining_calls = status.get("remaining_calls")
-    total_grants = status.get("total_grants")
-    current_grant = status.get("current_grant")
-    error = status.get("error")
-
-    if error:
-        return {
-            "status": "error",
-            "error": error,
-        }
-
-    if phase == PipelinePhase.PHASE_1_CALCULATING.value:
-        return {
-            "status": "calculating",
-            "remaining_calls": remaining_calls,
-        }
-
-    if phase == PipelinePhase.PHASE_2_DEEP_SCRAPING.value:
-        return {
-            "status": "deep_scraping",
-            "total_grants": total_grants,  # This is preliminaryFilteredGrants.length
-            "remaining_calls": remaining_calls,
-        }
-
-    if phase == PipelinePhase.PHASE_2_ANALYZING.value:
-        return {
-            "status": "analyzing",
-            "total_grants": total_grants,  # This is preliminaryFilteredGrants.length
-            "current_grant": current_grant,  # Index of grant + 1
-            "remaining_calls": remaining_calls,
-        }
-
-    if phase == PipelinePhase.COMPLETED.value:
-        return {
-            "status": "completed",
-            "message": "Pipeline completed successfully",
-            "total_grants": total_grants,
-        }
-
-    return {
-        "status": phase,
-        "remaining_calls": remaining_calls,
-        "total_grants": total_grants,
-    }
-
-
-@router.get("/get-status-stream/{initiative_id}")
-async def get_pipeline_status_stream(initiative_id: int):
-    """
-    Server-Sent Events stream for real-time pipeline status updates.
-
-    Sends updates whenever the pipeline status changes.
-    When status is "completed", sends a SUCCESS message and closes the stream.
-    """
-
-    async def event_generator():
-        last_status = None
-        while True:
-            status = get_status(initiative_id)
-
-            # Check if status changed
-            if status != last_status:
-                if status:
-                    phase = status.get("phase", "idle")
-                    if phase == PipelinePhase.COMPLETED.value:
-                        yield f"data: {json.dumps({'status': 'completed', 'message': 'Pipeline completed successfully'})}\n\n"
-                        break
-                    elif phase == PipelinePhase.ERROR.value:
-                        yield f"data: {json.dumps({'status': 'error', 'error': status.get('error')})}\n\n"
-                        break
-                    else:
-                        # Format status for SSE
-                        phase = status.get("phase", "idle")
-                        remaining_calls = status.get("remaining_calls")
-                        total_grants = status.get("total_grants")
-                        current_grant = status.get("current_grant")
-
-                        sse_data = {"status": phase}
-                        if remaining_calls is not None:
-                            sse_data["remaining_calls"] = remaining_calls
-                        if total_grants is not None:
-                            sse_data["total_grants"] = total_grants
-                        if current_grant is not None:
-                            sse_data["current_grant"] = current_grant
-
-                        yield f"data: {json.dumps(sse_data)}\n\n"
-                else:
-                    yield f"data: {json.dumps({'status': 'idle'})}\n\n"
-
-                last_status = status
-
-            await asyncio.sleep(1)  # Check every second
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-
-@router.get("/results/{initiative_id}")
-async def get_results(initiative_id: int, db: Session = Depends(get_db)):
-    """Get all results for an initiative."""
-    from app.models.gemini import sqlalchemy_to_dict
-
-    results = ResultAccess.get_by_initiative_id(db, initiative_id)
-
-    return {
-        "initiative_id": initiative_id,
-        "count": len(results),
-        "results": [sqlalchemy_to_dict(r) for r in results],
-    }

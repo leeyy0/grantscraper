@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -7,6 +8,8 @@ from playwright.sync_api import Page, sync_playwright
 
 if TYPE_CHECKING:
     from models.models import Grant
+
+logger = logging.getLogger(__name__)
 
 
 def get_links(page: Page) -> list[dict[str, str]]:
@@ -20,8 +23,11 @@ def get_links(page: Page) -> list[dict[str, str]]:
     """
     grant_links = []
     grant_cards = page.locator('[class*="itemsContainer"]')
+    total_cards = grant_cards.count()
 
-    for i in range(grant_cards.count()):
+    logger.debug(f"Found {total_cards} grant cards on page")
+
+    for i in range(total_cards):
         card = grant_cards.nth(i)
 
         # Check if the grant is closed
@@ -62,7 +68,13 @@ def get_links(page: Page) -> list[dict[str, str]]:
                             "button_text": button_text.strip() if button_text else None,
                         }
                     )
+                    logger.debug(f"Found open grant: {button_text}")
+        else:
+            logger.debug(f"Skipping closed grant (card {i + 1})")
 
+    logger.info(
+        f"Extracted {len(grant_links)} open grants from {total_cards} total cards"
+    )
     return grant_links
 
 
@@ -76,8 +88,11 @@ def extract_card_body_content(page: Page, url: str) -> str:
     Returns:
         HTML content of the card-body div as a string
     """
-    page.goto(url)
-    page.wait_for_selector(".card-body", state="visible")
+    page.goto(url, wait_until="domcontentloaded")
+    # Wait for the card-body to be attached to DOM (not necessarily visible)
+    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    # Give it a moment to render
+    page.wait_for_timeout(1000)
 
     # Extract the HTML content of the card-body div
     card_body = page.locator(".card-body").first
@@ -102,8 +117,11 @@ def extract_card_body_text(page: Page, url: str) -> str:
     Returns:
         Clean plain text with structure preserved
     """
-    page.goto(url)
-    page.wait_for_selector(".card-body", state="visible")
+    page.goto(url, wait_until="domcontentloaded")
+    # Wait for the card-body to be attached to DOM (not necessarily visible)
+    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    # Give it a moment to render
+    page.wait_for_timeout(1000)
 
     # Extract clean text content (automatically handles HTML conversion)
     card_body = page.locator(".card-body").first
@@ -127,8 +145,11 @@ def extract_card_body_text_and_links(page: Page, url: str) -> tuple[str, list[st
         - text_content: Clean plain text with structure preserved
         - links: List of absolute URLs found in the card-body
     """
-    page.goto(url)
-    page.wait_for_selector(".card-body", state="visible")
+    page.goto(url, wait_until="domcontentloaded")
+    # Wait for the card-body to be attached to DOM (not necessarily visible)
+    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    # Give it a moment to render
+    page.wait_for_timeout(1000)
 
     card_body = page.locator(".card-body").first
 
@@ -167,8 +188,11 @@ def extract_links_from_card_body(page: Page, url: str) -> list[str]:
     Returns:
         List of absolute URLs found in the card-body
     """
-    page.goto(url)
-    page.wait_for_selector(".card-body", state="visible")
+    page.goto(url, wait_until="domcontentloaded")
+    # Wait for the card-body to be attached to DOM (not necessarily visible)
+    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    # Give it a moment to render
+    page.wait_for_timeout(1000)
 
     # Extract all links from the card-body
     card_body = page.locator(".card-body").first
@@ -298,77 +322,213 @@ def save_grants_to_db(
     """
     from app.access import GrantAccess, get_db_session
 
+    logger.info(f"Extracting details for {len(grant_links)} grants...")
+
     # Get grant details as model instances
     grant_models = get_grant_details_as_models(page, grant_links, use_text=use_text)
+
+    logger.info(f"Saving {len(grant_models)} grants to database...")
 
     # Save to database (create or update by URL)
     with get_db_session() as db:
         saved_grants = GrantAccess.create_or_update_many_by_url(db, grant_models)
 
+    logger.info(f"Successfully saved {len(saved_grants)} grants")
     return saved_grants
 
 
 # Screenshot directory - ensure screenshots go to backend/.private/screenshots
-SCREENSHOT_DIR = Path(__file__).parent.parent / ".private" / "screenshots"
+SCREENSHOT_DIR = Path(__file__).parent.parent.parent / ".private" / "screenshots"
 SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Generate timestamp for unique screenshot filenames
-timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-with sync_playwright() as p:
-    browser = p.chromium.launch(headless=False)
-    page = browser.new_page()
-    page.goto("https://oursggrants.gov.sg/grants/new")
-    print(page.title())
-    page.screenshot(
-        path=str(SCREENSHOT_DIR / f"screenshot_{timestamp}_01_initial_load.png"),
-        full_page=True,
-    )
+def scrape_and_refresh_grants(
+    take_screenshots: bool = False,
+    headless: bool = True,
+    save_to_db: bool = True,
+    job_id: str | None = None,
+) -> dict:
+    """
+    Scrape open grants from the website and optionally save to database.
 
-    # Wait for the filter section to load
-    print("waiting for selector")
-    page.wait_for_selector("#applyAs-1", state="visible")
+    This function performs the complete grant scraping workflow:
+    1. Navigate to the grants listing page
+    2. Apply filters (Organisation checkbox)
+    3. Extract links for open grants (closed grants are filtered out)
+    4. Extract grant details from each page
+    5. Optionally save to database
 
-    # Click on the "Organisation" checkbox
-    # Try clicking the label first (more reliable), fallback to JS click if needed
-    print("trying to click the label first")
-    checkbox = page.locator("#applyAs-1")
+    Args:
+        take_screenshots: Whether to save screenshots during scraping
+        headless: Whether to run browser in headless mode
+        save_to_db: Whether to save grants to database
+        job_id: Optional job ID for status tracking
+
+    Returns:
+        Dictionary with:
+        - 'total_found': Number of open grants found
+        - 'grants_saved': Number of grants saved to DB (if save_to_db=True)
+        - 'grant_urls': List of grant URLs processed
+        - 'errors': List of any errors encountered
+    """
+    logger.info("Starting grant scraping process...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    errors = []
+    grant_urls = []
+
+    # Import status tracking if job_id provided
+    if job_id:
+        from app.services.refresh_status import RefreshPhase, update_refresh_status
+
+        update_refresh_status(
+            job_id, RefreshPhase.STARTING, message="Initializing browser"
+        )
+
     try:
-        # Try clicking the label associated with the checkbox
-        print("trying to click the label associated with checkbox")
-        page.locator('label[for="applyAs-1"]').click(timeout=5000)
-    except Exception:
-        # If label click fails, use JavaScript to click the checkbox directly
-        # This bypasses viewport issues
-        print("using javascript to click\n\n")
-        checkbox.evaluate("element => element.click()")
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=headless)
+            page = browser.new_page()
 
-    # Wait a moment for the filter to apply
-    page.wait_for_timeout(1000)
-    page.screenshot(
-        path=str(
-            SCREENSHOT_DIR / f"screenshot_{timestamp}_02_after_checkbox_click.png"
-        ),
-        full_page=True,
-    )
+            # Navigate to grants page
+            logger.info("Navigating to grants listing page...")
+            if job_id:
+                update_refresh_status(
+                    job_id, RefreshPhase.NAVIGATING, message="Navigating to grants page"
+                )
+            page.goto("https://oursggrants.gov.sg/grants/new")
+            logger.info(f"Page loaded: {page.title()}")
 
-    # Wait for grant cards to be visible
-    page.wait_for_selector('[class*="itemsContainer"]', state="visible")
-    page.screenshot(
-        path=str(SCREENSHOT_DIR / f"screenshot_{timestamp}_03_grant_cards_visible.png"),
-        full_page=True,
-    )
+            if take_screenshots:
+                page.screenshot(
+                    path=str(
+                        SCREENSHOT_DIR / f"screenshot_{timestamp}_01_initial_load.png"
+                    ),
+                    full_page=True,
+                )
 
-    # Extract links for grants that are not closed
-    grant_links = get_links(page)
+            # Wait for the filter section to load
+            logger.info("Waiting for filter section to load...")
+            page.wait_for_selector("#applyAs-1", state="visible")
 
-    # Print the extracted links
-    print(f"\nFound {len(grant_links)} open grant(s):")
-    for grant in grant_links:
-        print(f"  - {grant['button_text']}: {grant['url']}")
+            # Click on the "Organisation" checkbox
+            logger.info("Clicking Organisation filter...")
+            checkbox = page.locator("#applyAs-1")
+            try:
+                # Try clicking the label associated with the checkbox
+                page.locator('label[for="applyAs-1"]').click(timeout=5000)
+            except Exception as e:
+                logger.warning(f"Label click failed, using JavaScript fallback: {e}")
+                # If label click fails, use JavaScript to click the checkbox directly
+                checkbox.evaluate("element => element.click()")
 
-    page.screenshot(
-        path=str(SCREENSHOT_DIR / f"screenshot_{timestamp}_04_final_state.png"),
-        full_page=True,
-    )
-    browser.close()
+            # Wait a moment for the filter to apply
+            page.wait_for_timeout(1000)
+
+            if take_screenshots:
+                page.screenshot(
+                    path=str(
+                        SCREENSHOT_DIR
+                        / f"screenshot_{timestamp}_02_after_checkbox_click.png"
+                    ),
+                    full_page=True,
+                )
+
+            # Wait for grant cards to be visible
+            logger.info("Waiting for grant cards to load...")
+            page.wait_for_selector('[class*="itemsContainer"]', state="visible")
+
+            if take_screenshots:
+                page.screenshot(
+                    path=str(
+                        SCREENSHOT_DIR
+                        / f"screenshot_{timestamp}_03_grant_cards_visible.png"
+                    ),
+                    full_page=True,
+                )
+
+            # Extract links for grants that are not closed
+            logger.info("Extracting grant links...")
+            if job_id:
+                update_refresh_status(
+                    job_id,
+                    RefreshPhase.EXTRACTING_LINKS,
+                    message="Extracting grant links",
+                )
+            grant_links = get_links(page)
+            logger.info(f"Found {len(grant_links)} open grant(s)")
+
+            for grant in grant_links:
+                logger.info(f"  - {grant['button_text']}: {grant['url']}")
+                grant_urls.append(grant["url"])
+
+            if job_id:
+                update_refresh_status(
+                    job_id,
+                    RefreshPhase.SCRAPING_DETAILS,
+                    total_found=len(grant_links),
+                    message=f"Found {len(grant_links)} grants, starting detailed scraping",
+                )
+
+            if take_screenshots:
+                page.screenshot(
+                    path=str(
+                        SCREENSHOT_DIR / f"screenshot_{timestamp}_04_final_state.png"
+                    ),
+                    full_page=True,
+                )
+
+            # Save to database if requested
+            grants_saved = 0
+            if save_to_db and grant_links:
+                logger.info("Saving grants to database...")
+                if job_id:
+                    update_refresh_status(
+                        job_id,
+                        RefreshPhase.SAVING_TO_DB,
+                        total_found=len(grant_links),
+                        message="Saving grants to database",
+                    )
+                try:
+                    saved_grants = save_grants_to_db(page, grant_links, use_text=True)
+                    grants_saved = len(saved_grants)
+                    logger.info(f"Successfully saved {grants_saved} grants to database")
+                except Exception as e:
+                    error_msg = f"Error saving grants to database: {e}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+
+            browser.close()
+            logger.info("Scraping completed successfully")
+
+            result = {
+                "total_found": len(grant_links),
+                "grants_saved": grants_saved,
+                "grant_urls": grant_urls,
+                "errors": errors,
+            }
+
+            # Update final status
+            if job_id:
+                from app.services.refresh_status import complete_refresh
+
+                complete_refresh(
+                    job_id, len(grant_links), grants_saved, grant_urls, errors
+                )
+
+            return result
+
+    except Exception as e:
+        error_msg = f"Error during scraping: {e}"
+        logger.error(error_msg, exc_info=True)
+        errors.append(error_msg)
+
+        # Update error status
+        if job_id:
+            update_refresh_status(job_id, RefreshPhase.ERROR, error=error_msg)
+
+        return {
+            "total_found": 0,
+            "grants_saved": 0,
+            "grant_urls": grant_urls,
+            "errors": errors,
+        }
