@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import sync_playwright
 
-from services.scraper import get_grant_details
+from app.services.scraper import get_grant_details
 
 # Subset of grant links from the terminal output (lines 193-224)
 # Using a small subset for testing
