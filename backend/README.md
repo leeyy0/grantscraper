@@ -58,7 +58,7 @@ Routes for running and monitoring the grant filtering pipeline.
 Trigger the grant filtering pipeline for an initiative.
 
 ```http
-GET /pipeline/filter-grants/{initiative_id}
+POST /pipeline/filter-grants/{initiative_id}
 ```
 
 **Parameters:**
@@ -465,7 +465,7 @@ LOG_FILE=/var/log/grantscraper/api.log
 
 3. **Run pipeline for an initiative**:
    ```bash
-   curl "http://localhost:8000/pipeline/filter-grants/123?threshold=60"
+   curl -X POST "http://localhost:8000/pipeline/filter-grants/123?threshold=60"
    ```
 
 4. **Monitor progress**:

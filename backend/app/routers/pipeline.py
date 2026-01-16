@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
 
-@router.get("/filter-grants/{initiative_id}")
+@router.post("/filter-grants/{initiative_id}")
 async def filter_grants(initiative_id: int, threshold: int = RATING_THRESHOLD):
     """
     Trigger the grant filtering pipeline for an initiative.
