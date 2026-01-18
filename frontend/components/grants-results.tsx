@@ -18,27 +18,34 @@ interface GrantResultsProps {
   grants: GrantResult[]
 }
 
-
 export function GrantResults({ grants }: GrantResultsProps) {
   return (
-    <div className="mt-8 pt-6 border-t border-border">
-      <h2 className="text-xl font-semibold mb-4">Grant Results</h2>
+    <div className="border-border mt-8 border-t pt-6">
+      <h2 className="mb-4 text-xl font-semibold">Grant Results</h2>
       <div className="space-y-4">
         {grants.map((grant) => (
           <Link key={grant.id} href={`/grant/${grant.id}`}>
-            <Card className="border border-border hover:border-primary/50 hover:shadow-md transition-all cursor-pointer">
+            <Card className="border-border hover:border-primary/50 cursor-pointer border transition-all hover:shadow-md">
               <CardContent className="p-4">
                 {/* Match and Uncertainty ratings - side by side, larger text */}
-                <div className="flex gap-6 mb-4">
+                <div className="mb-4 flex gap-6">
                   <div className="flex flex-col">
-                    <span className="text-sm text-muted-foreground">Match Rating</span>
-                    <span className={`text-3xl font-bold ${getRatingColor(grant.match_rating)}`}>
+                    <span className="text-muted-foreground text-sm">
+                      Match Rating
+                    </span>
+                    <span
+                      className={`text-3xl font-bold ${getRatingColor(grant.match_rating)}`}
+                    >
                       {grant.match_rating}%
                     </span>
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm text-muted-foreground">Uncertainty Rating</span>
-                    <span className={`text-3xl font-bold ${getRatingColor(grant.uncertainty_rating, true)}`}>
+                    <span className="text-muted-foreground text-sm">
+                      Uncertainty Rating
+                    </span>
+                    <span
+                      className={`text-3xl font-bold ${getRatingColor(grant.uncertainty_rating, true)}`}
+                    >
                       {grant.uncertainty_rating}%
                     </span>
                   </div>

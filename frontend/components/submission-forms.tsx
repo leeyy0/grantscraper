@@ -1,20 +1,38 @@
 "use client"
 
-import { useState } from "react"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { useState, useEffect } from "react"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { OrganizationForm, type OrganizationFormErrors } from "@/components/organization-form"
-import { InitiativeForm, type InitiativeFormErrors } from "@/components/initiative-form"
+import {
+  OrganisationForm,
+  type OrganisationFormErrors,
+} from "@/components/organisation-form"
+import {
+  InitiativeForm,
+  type InitiativeFormErrors,
+} from "@/components/initiative-form"
 import { GrantResults, type GrantResult } from "@/components/grants-results"
 import { useFormContext } from "@/lib/form-context"
 import { grantDetails, type GrantDetail } from "@/lib/grant-data"
+import * as organisations from "@/lib/supabase/db/organisations"
+import * as initiatives from "@/lib/supabase/db/initiatives"
+import { toast } from "sonner"
 
 function formatDeadline(deadline: string | null): string {
   if (!deadline) return "No deadline specified"
   try {
     const date = new Date(deadline)
-    return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
   } catch {
     return deadline
   }
@@ -34,8 +52,8 @@ function convertGrantDetailToResult(grant: GrantDetail): GrantResult {
 
 export function SubmissionForms() {
   const {
-    organizationForm,
-    setOrganizationForm,
+    organisationForm,
+    setOrganisationForm,
     initiativeForm,
     setInitiativeForm,
     showResults,
@@ -47,28 +65,106 @@ export function SubmissionForms() {
   } = useFormContext()
 
   const [errors, setErrors] = useState<{
-    organization: OrganizationFormErrors
+    organisation: OrganisationFormErrors
     initiative: InitiativeFormErrors
   }>({
-    organization: {},
+    organisation: {},
     initiative: {},
   })
 
+  const [isLoadingOrg, setIsLoadingOrg] = useState(true)
+  const [isLoadingInit, setIsLoadingInit] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [orgId, setOrgId] = useState<number | null>(null)
+  const [initiativeId, setInitiativeId] = useState<number | null>(null)
+
+  // Fetch and prefill organisation data on mount
+  useEffect(() => {
+    const fetchOrganisation = async () => {
+      try {
+        setIsLoadingOrg(true)
+        const { data, error } = await organisations.getById(1)
+
+        if (error) {
+          console.error("Error fetching organisation:", error)
+          toast.error("Failed to load organisation data")
+          return
+        }
+
+        if (data) {
+          setOrgId(data.id)
+          setOrganisationForm({
+            name: data.name,
+            mission_and_focus: data.mission_and_focus,
+            about_us: data.about_us,
+            remarks: data.remarks || "",
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching organisation:", error)
+        toast.error("Failed to load organisation data")
+      } finally {
+        setIsLoadingOrg(false)
+      }
+    }
+
+    fetchOrganisation()
+  }, [setOrganisationForm])
+
+  // Fetch and prefill initiative data on mount
+  useEffect(() => {
+    const fetchInitiative = async () => {
+      try {
+        setIsLoadingInit(true)
+        // Get the first initiative for organisation id=1
+        const { data, error } = await initiatives.getByOrganisation(1)
+
+        if (error) {
+          console.error("Error fetching initiative:", error)
+          toast.error("Failed to load initiative data")
+          return
+        }
+
+        // If there's an initiative, use the first one
+        if (data && data.length > 0) {
+          const initiative = data[0]
+          setInitiativeId(initiative.id)
+          setInitiativeForm({
+            title: initiative.title,
+            goals_objective: initiative.goals,
+            audience_beneficiaries: initiative.audience,
+            estimated_cost: initiative.costs ? initiative.costs.toString() : "",
+            stage_of_initiative: initiative.stage,
+            demographic: initiative.demographic || "",
+            remarks: initiative.remarks || "",
+          })
+        }
+      } catch (error) {
+        console.error("Error fetching initiative:", error)
+        toast.error("Failed to load initiative data")
+      } finally {
+        setIsLoadingInit(false)
+      }
+    }
+
+    fetchInitiative()
+  }, [setInitiativeForm])
+
   const validateForms = () => {
     const newErrors = {
-      organization: {} as OrganizationFormErrors,
+      organisation: {} as OrganisationFormErrors,
       initiative: {} as InitiativeFormErrors,
     }
 
-    // Validate Organization Form
-    if (!organizationForm.name.trim()) {
-      newErrors.organization.name = "Name is required"
+    // Validate Organisation Form
+    if (!organisationForm.name.trim()) {
+      newErrors.organisation.name = "Name is required"
     }
-    if (!organizationForm.mission_and_focus.trim()) {
-      newErrors.organization.mission_and_focus = "Mission and Focus is required"
+    if (!organisationForm.mission_and_focus.trim()) {
+      newErrors.organisation.mission_and_focus = "Mission and Focus is required"
     }
-    if (!organizationForm.about_us.trim()) {
-      newErrors.organization.about_us = "About Us is required"
+    if (!organisationForm.about_us.trim()) {
+      newErrors.organisation.about_us = "About Us is required"
     }
 
     // Validate Initiative Form
@@ -76,81 +172,172 @@ export function SubmissionForms() {
       newErrors.initiative.title = "Title is required"
     }
     if (!initiativeForm.goals_objective.trim()) {
-      newErrors.initiative.goals_objective = "Goals/Objective is required"
+      newErrors.initiative.goals_objective = "Goals/ Objective is required"
     }
     if (!initiativeForm.audience_beneficiaries.trim()) {
-      newErrors.initiative.audience_beneficiaries = "Audience/Target Beneficiaries is required"
+      newErrors.initiative.audience_beneficiaries =
+        "Audience/ Target Beneficiaries is required"
     }
     if (
       initiativeForm.estimated_cost.trim() &&
-      (isNaN(Number.parseInt(initiativeForm.estimated_cost)) || Number.parseInt(initiativeForm.estimated_cost) < 0)
+      (isNaN(Number.parseInt(initiativeForm.estimated_cost)) ||
+        Number.parseInt(initiativeForm.estimated_cost) < 0)
     ) {
-      newErrors.initiative.estimated_cost = "Estimated Cost must be a valid positive integer"
+      newErrors.initiative.estimated_cost =
+        "Estimated Cost must be a valid positive integer"
     }
 
     setErrors(newErrors)
 
-    return Object.keys(newErrors.organization).length === 0 && Object.keys(newErrors.initiative).length === 0
+    return (
+      Object.keys(newErrors.organisation).length === 0 &&
+      Object.keys(newErrors.initiative).length === 0
+    )
   }
 
-  const handleSubmit = () => {
-    if (validateForms()) {
-      const submissionData = {
-        organization: {
-          name: organizationForm.name,
-          mission_and_focus: organizationForm.mission_and_focus,
-          about_us: organizationForm.about_us,
-          remarks: organizationForm.remarks.trim() || null,
-        },
-        initiative: {
-          title: initiativeForm.title,
-          goals_objective: initiativeForm.goals_objective,
-          audience_beneficiaries: initiativeForm.audience_beneficiaries,
-          estimated_cost: initiativeForm.estimated_cost.trim() ? Number.parseInt(initiativeForm.estimated_cost) : null,
-          stage_of_initiative: initiativeForm.stage_of_initiative.trim() || null,
-          demographic: initiativeForm.demographic.trim() || null,
-          remarks: initiativeForm.remarks.trim() || null,
-        },
+  const handleSubmit = async () => {
+    if (!validateForms()) {
+      return
+    }
+
+    try {
+      setIsSubmitting(true)
+
+      // Update organisation if orgId exists
+      if (orgId) {
+        const { error: orgError } = await organisations.update(orgId, {
+          name: organisationForm.name,
+          mission_and_focus: organisationForm.mission_and_focus,
+          about_us: organisationForm.about_us,
+          remarks: organisationForm.remarks.trim() || null,
+        })
+
+        if (orgError) {
+          console.error("Error updating organisation:", orgError)
+          toast.error("Failed to update organisation. Please try again.")
+          return
+        }
       }
-      console.log("Form submitted:", submissionData)
+
+      // Update or create initiative
+      const initiativeData = {
+        title: initiativeForm.title,
+        goals: initiativeForm.goals_objective,
+        audience: initiativeForm.audience_beneficiaries,
+        costs: initiativeForm.estimated_cost.trim()
+          ? Number.parseInt(initiativeForm.estimated_cost)
+          : null,
+        stage: initiativeForm.stage_of_initiative.trim() || "Planning",
+        demographic: initiativeForm.demographic.trim() || null,
+        remarks: initiativeForm.remarks.trim() || null,
+        organisation_id: orgId || 1,
+      }
+
+      if (initiativeId) {
+        // Update existing initiative
+        const { error: initError } = await initiatives.update(
+          initiativeId,
+          initiativeData,
+        )
+
+        if (initError) {
+          console.error("Error updating initiative:", initError)
+          toast.error("Failed to update initiative. Please try again.")
+          return
+        }
+      } else {
+        // Create new initiative
+        const { data: newInitiative, error: initError } =
+          await initiatives.create(initiativeData)
+
+        if (initError) {
+          console.error("Error creating initiative:", initError)
+          toast.error("Failed to create initiative. Please try again.")
+          return
+        }
+
+        if (newInitiative) {
+          setInitiativeId(newInitiative.id)
+        }
+      }
+
+      toast.success("Information saved successfully!")
+
       // Convert GrantDetail[] to GrantResult[] format
       const results = grantDetails.map(convertGrantDetailToResult)
       setGrantResults(results)
       setShowResults(true)
       setAccordionValue([])
+    } catch (error) {
+      console.error("Error submitting form:", error)
+      toast.error("An unexpected error occurred. Please try again.")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <Card className="border border-border">
-      <CardContent className="p-6">
-        <Accordion type="multiple" value={accordionValue} onValueChange={setAccordionValue} className="w-full">
-          <AccordionItem value="organization">
-            <AccordionTrigger className="text-lg font-semibold">Organization Information</AccordionTrigger>
+    <Card className="border-border border">
+      <CardContent className="px-6">
+        <Accordion
+          type="multiple"
+          value={accordionValue}
+          onValueChange={setAccordionValue}
+          className="w-full"
+        >
+          <AccordionItem value="organisation">
+            <AccordionTrigger className="text-lg font-semibold">
+              Organisation Information
+            </AccordionTrigger>
             <AccordionContent>
-              <OrganizationForm
-                formData={organizationForm}
-                onChange={setOrganizationForm}
-                errors={errors.organization}
-              />
+              {isLoadingOrg ? (
+                <div className="text-muted-foreground py-8 text-center">
+                  Loading organisation data...
+                </div>
+              ) : (
+                <OrganisationForm
+                  formData={organisationForm}
+                  onChange={setOrganisationForm}
+                  errors={errors.organisation}
+                />
+              )}
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="initiative">
-            <AccordionTrigger className="text-lg font-semibold">Initiative Details</AccordionTrigger>
+            <AccordionTrigger className="text-lg font-semibold">
+              Initiative Details
+            </AccordionTrigger>
             <AccordionContent>
-              <InitiativeForm formData={initiativeForm} onChange={setInitiativeForm} errors={errors.initiative} />
+              {isLoadingInit ? (
+                <div className="text-muted-foreground py-8 text-center">
+                  Loading initiative data...
+                </div>
+              ) : (
+                <InitiativeForm
+                  formData={initiativeForm}
+                  onChange={setInitiativeForm}
+                  errors={errors.initiative}
+                />
+              )}
             </AccordionContent>
           </AccordionItem>
         </Accordion>
 
-        <div className="mt-6 pt-6 border-t border-border">
-          <Button onClick={handleSubmit} className="w-full" size="lg">
-            Submit Information
+        <div className="border-border mt-6 border-t pt-6">
+          <Button
+            onClick={handleSubmit}
+            className="w-full"
+            size="lg"
+            disabled={isSubmitting || isLoadingOrg || isLoadingInit}
+          >
+            {isSubmitting ? "Saving..." : "Save Information"}
           </Button>
         </div>
 
-        {showResults && grantResults.length > 0 && <GrantResults grants={grantResults} />}
+        {showResults && grantResults.length > 0 && (
+          <GrantResults grants={grantResults} />
+        )}
       </CardContent>
     </Card>
   )

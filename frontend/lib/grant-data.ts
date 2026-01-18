@@ -22,9 +22,9 @@ export const grantDetails: GrantDetail[] = [
     uncertainty_rating: 8,
     grant_name: "Community Development Grant",
     grant_description:
-      "This grant supports grassroots organizations working to strengthen local communities through sustainable development initiatives. The fund prioritizes projects that demonstrate measurable impact on community well-being and economic growth.",
+      "This grant supports grassroots organisations working to strengthen local communities through sustainable development initiatives. The fund prioritizes projects that demonstrate measurable impact on community well-being and economic growth.",
     criteria: [
-      "Organization must be a registered 501(c)(3) nonprofit",
+      "Organisation must be a registered 501(c)(3) nonprofit",
       "Minimum 2 years of operational history",
       "Annual budget under $500,000",
       "Project must serve underrepresented communities",
@@ -32,12 +32,15 @@ export const grantDetails: GrantDetail[] = [
     grant_amount: "$50,000",
     grant_sponsors: "Ford Foundation",
     deadline: "2026-03-15T23:59:59",
-    sources: ["https://www.fordfoundation.org/grants/community-development", "https://www.fordfoundation.org/apply"],
+    sources: [
+      "https://www.fordfoundation.org/grants/community-development",
+      "https://www.fordfoundation.org/apply",
+    ],
     explanations: {
       match_rating:
-        "Your organization's focus on community empowerment and sustainable development aligns strongly with the grant's priorities. Your 5-year track record and budget size meet all eligibility criteria.",
+        "Your organisation's focus on community empowerment and sustainable development aligns strongly with the grant's priorities. Your 5-year track record and budget size meet all eligibility criteria.",
       uncertainty_rating:
-        "Low uncertainty due to clear eligibility criteria and your organization's well-documented history of community impact.",
+        "Low uncertainty due to clear eligibility criteria and your organisation's well-documented history of community impact.",
     },
   },
   {
@@ -56,7 +59,10 @@ export const grantDetails: GrantDetail[] = [
     grant_amount: "$75,000",
     grant_sponsors: "Gates Foundation, UNICEF",
     deadline: "2026-04-30T23:59:59",
-    sources: ["https://www.gatesfoundation.org/education-grants", "https://www.unicef.org/funding/youth-education"],
+    sources: [
+      "https://www.gatesfoundation.org/education-grants",
+      "https://www.unicef.org/funding/youth-education",
+    ],
     explanations: {
       match_rating:
         "Your initiative's focus on youth education and technology integration aligns well with the fund's goals. Partnership with local schools strengthens your application.",
@@ -70,7 +76,7 @@ export const grantDetails: GrantDetail[] = [
     uncertainty_rating: 18,
     grant_name: "Environmental Sustainability Grant",
     grant_description:
-      "This grant supports organizations implementing innovative environmental solutions at the local level. Priority is given to projects addressing climate resilience, renewable energy adoption, and community-based conservation efforts.",
+      "This grant supports organisations implementing innovative environmental solutions at the local level. Priority is given to projects addressing climate resilience, renewable energy adoption, and community-based conservation efforts.",
     criteria: [
       "Project must address measurable environmental impact",
       "Community engagement component required",
@@ -80,7 +86,10 @@ export const grantDetails: GrantDetail[] = [
     grant_amount: "$120,000",
     grant_sponsors: "Bloomberg Philanthropies",
     deadline: "2026-05-20T23:59:59",
-    sources: ["https://www.bloomberg.org/environment/grants", "https://www.bloomberg.org/apply-for-funding"],
+    sources: [
+      "https://www.bloomberg.org/environment/grants",
+      "https://www.bloomberg.org/apply-for-funding",
+    ],
     explanations: {
       match_rating:
         "Your environmental initiatives show good alignment with sustainability goals. Community engagement approach matches the grant's priorities.",
@@ -94,7 +103,7 @@ export const grantDetails: GrantDetail[] = [
     uncertainty_rating: 70,
     grant_name: "Healthcare Access Program",
     grant_description:
-      "Funding for organizations working to expand healthcare access in underserved communities. The program supports mobile health clinics, telehealth initiatives, preventive care programs, and health education campaigns.",
+      "Funding for organisations working to expand healthcare access in underserved communities. The program supports mobile health clinics, telehealth initiatives, preventive care programs, and health education campaigns.",
     criteria: [
       "Must serve populations with limited healthcare access",
       "Licensed healthcare professionals required on staff or as partners",
@@ -110,7 +119,7 @@ export const grantDetails: GrantDetail[] = [
     ],
     explanations: {
       match_rating:
-        "Your organization shows potential alignment with healthcare access goals, though primary focus may differ from the grant's specific healthcare priorities.",
+        "Your organisation shows potential alignment with healthcare access goals, though primary focus may differ from the grant's specific healthcare priorities.",
       uncertainty_rating:
         "High uncertainty due to strict regulatory compliance requirements and the need for licensed healthcare partnerships that may not be established.",
     },
@@ -137,9 +146,9 @@ export const grantDetails: GrantDetail[] = [
     ],
     explanations: {
       match_rating:
-        "Your organization's current focus does not strongly align with digital inclusion priorities. Limited technology-focused initiatives in your program portfolio.",
+        "Your organisation's current focus does not strongly align with digital inclusion priorities. Limited technology-focused initiatives in your program portfolio.",
       uncertainty_rating:
-        "Moderate uncertainty as eligibility requirements are flexible, but your organization would need to demonstrate stronger digital equity focus.",
+        "Moderate uncertainty as eligibility requirements are flexible, but your organisation would need to demonstrate stronger digital equity focus.",
     },
   },
 ]

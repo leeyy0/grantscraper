@@ -9,17 +9,19 @@ import * as initiatives from "./initiatives"
 export async function getInitiativeAnalysis(initiativeId: number) {
   const { data, error } = await supabase
     .from("initiatives")
-    .select(`
+    .select(
+      `
       *,
       organisations(*),
       results(
         *,
         grants(*)
       )
-    `)
+    `,
+    )
     .eq("id", initiativeId)
     .single()
-  
+
   return { data, error }
 }
 
@@ -29,7 +31,8 @@ export async function getInitiativeAnalysis(initiativeId: number) {
 export async function getOrganisationComplete(organisationId: number) {
   const { data, error } = await supabase
     .from("organisations")
-    .select(`
+    .select(
+      `
       *,
       initiatives(
         *,
@@ -38,10 +41,11 @@ export async function getOrganisationComplete(organisationId: number) {
           grants(*)
         )
       )
-    `)
+    `,
+    )
     .eq("id", organisationId)
     .single()
-  
+
   return { data, error }
 }
 
@@ -51,7 +55,8 @@ export async function getOrganisationComplete(organisationId: number) {
 export async function getGrantWithMatches(grantId: number) {
   const { data, error } = await supabase
     .from("grants")
-    .select(`
+    .select(
+      `
       *,
       results(
         *,
@@ -60,10 +65,11 @@ export async function getGrantWithMatches(grantId: number) {
           organisations(*)
         )
       )
-    `)
+    `,
+    )
     .eq("id", grantId)
     .single()
-  
+
   return { data, error }
 }
 
@@ -81,6 +87,10 @@ export async function globalSearch(searchTerm: string) {
     grants: grantsResult.data || [],
     organisations: orgsResult.data || [],
     initiatives: initiativesResult.data || [],
-    errors: [grantsResult.error, orgsResult.error, initiativesResult.error].filter(Boolean),
+    errors: [
+      grantsResult.error,
+      orgsResult.error,
+      initiativesResult.error,
+    ].filter(Boolean),
   }
 }

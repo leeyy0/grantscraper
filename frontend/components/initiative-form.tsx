@@ -30,7 +30,11 @@ interface InitiativeFormProps {
   errors: InitiativeFormErrors
 }
 
-export function InitiativeForm({ formData, onChange, errors }: InitiativeFormProps) {
+export function InitiativeForm({
+  formData,
+  onChange,
+  errors,
+}: InitiativeFormProps) {
   return (
     <div className="space-y-4 pt-4">
       <div className="space-y-2">
@@ -43,48 +47,70 @@ export function InitiativeForm({ formData, onChange, errors }: InitiativeFormPro
           value={formData.title}
           onChange={(e) => onChange({ ...formData, title: e.target.value })}
         />
-        {errors.title && <p className="text-sm text-destructive">{errors.title}</p>}
+        {errors.title && (
+          <p className="text-destructive text-sm">{errors.title}</p>
+        )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="goals">
-          Goals/Objective of the Initiative <span className="text-destructive">*</span>
+          Goals/ Objective of the Initiative{" "}
+          <span className="text-destructive">*</span>
         </Label>
         <Textarea
           id="goals"
           placeholder="Describe the goals and objectives"
+          className="min-h-60"
           rows={3}
           value={formData.goals_objective}
-          onChange={(e) => onChange({ ...formData, goals_objective: e.target.value })}
+          onChange={(e) =>
+            onChange({ ...formData, goals_objective: e.target.value })
+          }
         />
-        {errors.goals_objective && <p className="text-sm text-destructive">{errors.goals_objective}</p>}
+        {errors.goals_objective && (
+          <p className="text-destructive text-sm">{errors.goals_objective}</p>
+        )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="audience">
-          Audience/Target Beneficiaries <span className="text-destructive">*</span>
+          Audience/ Target Beneficiaries{" "}
+          <span className="text-destructive">*</span>
         </Label>
         <Textarea
           id="audience"
           placeholder="Who will benefit from this initiative?"
+          className="min-h-60"
           rows={2}
           value={formData.audience_beneficiaries}
-          onChange={(e) => onChange({ ...formData, audience_beneficiaries: e.target.value })}
+          onChange={(e) =>
+            onChange({ ...formData, audience_beneficiaries: e.target.value })
+          }
         />
-        {errors.audience_beneficiaries && <p className="text-sm text-destructive">{errors.audience_beneficiaries}</p>}
+        {errors.audience_beneficiaries && (
+          <p className="text-destructive text-sm">
+            {errors.audience_beneficiaries}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="cost">Estimated Cost of the Initiative in SGD (Optional)</Label>
+        <Label htmlFor="cost">
+          Estimated Cost of the Initiative in SGD (Optional)
+        </Label>
         <Input
           id="cost"
           type="number"
           min={0}
           placeholder="Enter estimated cost"
           value={formData.estimated_cost}
-          onChange={(e) => onChange({ ...formData, estimated_cost: e.target.value })}
+          onChange={(e) =>
+            onChange({ ...formData, estimated_cost: e.target.value })
+          }
         />
-        {errors.estimated_cost && <p className="text-sm text-destructive">{errors.estimated_cost}</p>}
+        {errors.estimated_cost && (
+          <p className="text-destructive text-sm">{errors.estimated_cost}</p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -93,9 +119,15 @@ export function InitiativeForm({ formData, onChange, errors }: InitiativeFormPro
           id="stage"
           placeholder="Enter stage of initiative"
           value={formData.stage_of_initiative}
-          onChange={(e) => onChange({ ...formData, stage_of_initiative: e.target.value })}
+          onChange={(e) =>
+            onChange({ ...formData, stage_of_initiative: e.target.value })
+          }
         />
-        {errors.stage_of_initiative && <p className="text-sm text-destructive">{errors.stage_of_initiative}</p>}
+        {errors.stage_of_initiative && (
+          <p className="text-destructive text-sm">
+            {errors.stage_of_initiative}
+          </p>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -104,7 +136,9 @@ export function InitiativeForm({ formData, onChange, errors }: InitiativeFormPro
           id="demographic"
           placeholder="Enter target demographic"
           value={formData.demographic}
-          onChange={(e) => onChange({ ...formData, demographic: e.target.value })}
+          onChange={(e) =>
+            onChange({ ...formData, demographic: e.target.value })
+          }
         />
       </div>
 
@@ -113,6 +147,7 @@ export function InitiativeForm({ formData, onChange, errors }: InitiativeFormPro
         <Textarea
           id="init-remarks"
           placeholder="Any additional remarks"
+          className="min-h-60"
           rows={2}
           value={formData.remarks}
           onChange={(e) => onChange({ ...formData, remarks: e.target.value })}
