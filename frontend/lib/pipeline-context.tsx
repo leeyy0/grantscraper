@@ -12,9 +12,9 @@ const PIPELINE_STORAGE_KEY = "running_pipeline"
 
 export interface PipelineStatus {
   status:
-    | "calculating_phase1"
+    | "calculating"
     | "filtering"
-    | "scraping_phase2"
+    | "deep_scraping"
     | "analyzing"
     | "completed"
     | "error"
@@ -66,12 +66,16 @@ export function PipelineProvider({ children }: { children: React.ReactNode }) {
       // Clear localStorage when pipeline completes or is idle
       localStorage.removeItem(PIPELINE_STORAGE_KEY)
     }
-  }, [pipelineStatus.initiative_id, pipelineStatus.status, pipelineStatus.initiative_title])
+  }, [
+    pipelineStatus.initiative_id,
+    pipelineStatus.status,
+    pipelineStatus.initiative_title,
+  ])
 
   const startPipeline = useCallback(
     (initiativeId: number, initiativeTitle: string) => {
       setPipelineStatus({
-        status: "calculating_phase1",
+        status: "calculating",
         initiative_id: initiativeId,
         initiative_title: initiativeTitle,
       })
@@ -82,7 +86,7 @@ export function PipelineProvider({ children }: { children: React.ReactNode }) {
   const resumePipeline = useCallback(
     (initiativeId: number, initiativeTitle: string) => {
       setPipelineStatus({
-        status: "calculating_phase1",
+        status: "calculating",
         initiative_id: initiativeId,
         initiative_title: initiativeTitle,
       })

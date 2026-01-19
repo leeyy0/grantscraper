@@ -49,19 +49,26 @@ def update_refresh_status(
     """Update refresh job status."""
     status = _refresh_status.get(job_id, {})
 
-    status.update(
-        {
-            "job_id": job_id,
-            "phase": phase.value,
-            "total_found": total_found,
-            "current_grant": current_grant,
-            "grants_saved": grants_saved,
-            "message": message,
-            "error": error,
-            "updated_at": datetime.utcnow().isoformat(),
-        }
-    )
+    # Build update dict with only non-None values to preserve existing data
+    updates = {
+        "job_id": job_id,
+        "phase": phase.value,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    
+    # Only update fields that are explicitly provided (not None)
+    if total_found is not None:
+        updates["total_found"] = total_found
+    if current_grant is not None:
+        updates["current_grant"] = current_grant
+    if grants_saved is not None:
+        updates["grants_saved"] = grants_saved
+    if message is not None:
+        updates["message"] = message
+    if error is not None:
+        updates["error"] = error
 
+    status.update(updates)
     set_refresh_status(job_id, status)
 
 

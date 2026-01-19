@@ -130,26 +130,54 @@ def extract_card_body_text(page: Page, url: str) -> str:
     return text_content
 
 
-def extract_card_body_text_and_links(page: Page, url: str) -> tuple[str, list[str]]:
-    """Extract both text content and links from the card-body div in a single page visit.
+def extract_card_body_text_and_links(
+    page: Page, url: str
+) -> tuple[str, list[str], str, str]:
+    """Extract grant details including issuer, title, text content and links in a single page visit.
 
-    This is more efficient than calling extract_card_body_text and extract_links_from_card_body
-    separately, as it only visits the page once.
+    This is more efficient than calling multiple extraction functions separately,
+    as it only visits the page once.
 
     Args:
         page: Playwright page object
         url: URL of the grant detail page to visit
 
     Returns:
-        Tuple of (text_content, links) where:
-        - text_content: Clean plain text with structure preserved
+        Tuple of (text_content, links, issuer, title) where:
+        - text_content: Clean plain text with structure preserved (from card-body)
         - links: List of absolute URLs found in the card-body
+        - issuer: Grant issuing agency (from .card-title h2)
+        - title: Grant title (from #grant-header)
     """
     page.goto(url, wait_until="domcontentloaded")
     # Wait for the card-body to be attached to DOM (not necessarily visible)
     page.wait_for_selector(".card-body", state="attached", timeout=60000)
     # Give it a moment to render
     page.wait_for_timeout(1000)
+
+    # Extract grant issuer from .card-title h2
+    issuer = ""
+    try:
+        issuer_element = page.locator(".card-title h2").first
+        if issuer_element.count() > 0:
+            issuer = issuer_element.inner_text().strip()
+            logger.debug(f"Extracted issuer: {issuer}")
+        else:
+            logger.warning(f"No .card-title h2 element found at {url}")
+    except Exception as e:
+        logger.warning(f"Could not extract grant issuer from {url}: {e}")
+
+    # Extract grant title from #grant-header
+    title = ""
+    try:
+        title_element = page.locator("#grant-header").first
+        if title_element.count() > 0:
+            title = title_element.inner_text().strip()
+            logger.debug(f"Extracted title: {title}")
+        else:
+            logger.warning(f"No #grant-header element found at {url}")
+    except Exception as e:
+        logger.warning(f"Could not extract grant title from {url}: {e}")
 
     card_body = page.locator(".card-body").first
 
@@ -175,7 +203,7 @@ def extract_card_body_text_and_links(page: Page, url: str) -> tuple[str, list[st
     seen = set()
     unique_links = [link for link in links if link not in seen and not seen.add(link)]
 
-    return text_content, unique_links
+    return text_content, unique_links, issuer, title
 
 
 def extract_links_from_card_body(page: Page, url: str) -> list[str]:
@@ -214,18 +242,23 @@ def extract_links_from_card_body(page: Page, url: str) -> list[str]:
 
 
 def get_grant_details(
-    page: Page, grant_links: list[dict[str, str]], use_text: bool = True
+    page: Page,
+    grant_links: list[dict[str, str]],
+    use_text: bool = True,
+    job_id: str | None = None,
 ) -> list[dict[str, str]]:
     """Visit all grant links and extract card-body content.
 
     This function is designed to extract grant content for LLM processing.
     By default, it returns clean text (recommended for LLMs), but can also
-    return HTML if needed. Also extracts links from the card-body for deep scraping.
+    return HTML if needed. Also extracts links from the card-body for deep scraping,
+    as well as grant issuer and title.
 
     Args:
         page: Playwright page object
         grant_links: List of grant link dictionaries with 'url' and 'button_text'
         use_text: If True, extract clean text (recommended for LLM). If False, extract HTML.
+        job_id: Optional job ID for status tracking
 
     Returns:
         List of dictionaries with:
@@ -233,16 +266,38 @@ def get_grant_details(
         - 'button_text': Button text from listing page
         - 'card_body_text' or 'card_body_html': Extracted content (depending on use_text)
         - 'links': List of URLs found in the card-body
+        - 'issuer': Grant issuing agency
+        - 'title': Grant title
     """
     grant_details = []
+    total_grants = len(grant_links)
 
-    for grant in grant_links:
-        print(f"Extracting content from: {grant['button_text']}")
+    # Import status tracking if job_id provided
+    if job_id:
+        from app.services.refresh_status import RefreshPhase, update_refresh_status
+
+    for idx, grant in enumerate(grant_links, start=1):
+        print(f"Extracting content from: {grant['url']}")
+        
+        # Update progress if job_id provided
+        if job_id:
+            update_refresh_status(
+                job_id,
+                RefreshPhase.SCRAPING_DETAILS,
+                total_found=total_grants,
+                current_grant=idx,
+                message=f"Scraping grant {idx} of {total_grants}",
+            )
+        
         try:
             if use_text:
-                # Extract both text and links in a single page visit (more efficient)
-                card_body_content, links = extract_card_body_text_and_links(
-                    page, grant["url"]
+                # Extract text, links, issuer, and title in a single page visit (more efficient)
+                card_body_content, links, issuer, title = (
+                    extract_card_body_text_and_links(page, grant["url"])
+                )
+                logger.info(
+                    f"Extracted grant - Issuer: '{issuer}', Title: '{title}', "
+                    f"Links: {len(links)}, Content: {len(card_body_content)} chars"
                 )
                 grant_details.append(
                     {
@@ -250,6 +305,8 @@ def get_grant_details(
                         "button_text": grant["button_text"],
                         "card_body_text": card_body_content,
                         "links": links,
+                        "issuer": issuer,
+                        "title": title,
                     }
                 )
             else:
@@ -263,6 +320,8 @@ def get_grant_details(
                         "button_text": grant["button_text"],
                         "card_body_html": card_body_content,
                         "links": links,
+                        "issuer": "",
+                        "title": "",
                     }
                 )
         except Exception as e:
@@ -274,6 +333,8 @@ def get_grant_details(
                     "button_text": grant["button_text"],
                     key: None,
                     "links": [],
+                    "issuer": "",
+                    "title": "",
                     "error": str(e),
                 }
             )
@@ -282,7 +343,10 @@ def get_grant_details(
 
 
 def get_grant_details_as_models(
-    page: Page, grant_links: list[dict[str, str]], use_text: bool = True
+    page: Page,
+    grant_links: list[dict[str, str]],
+    use_text: bool = True,
+    job_id: str | None = None,
 ) -> list["Grant"]:
     """Get grant details and return as Grant SQLAlchemy model instances.
 
@@ -293,18 +357,22 @@ def get_grant_details_as_models(
         page: Playwright page object
         grant_links: List of grant link dictionaries with 'url' and 'button_text'
         use_text: If True, extract clean text (recommended for LLM). If False, extract HTML.
+        job_id: Optional job ID for status tracking
 
     Returns:
         List of Grant SQLAlchemy model instances (not yet persisted to database)
     """
     from app.models.models import Grant
 
-    grant_dicts = get_grant_details(page, grant_links, use_text=use_text)
+    grant_dicts = get_grant_details(page, grant_links, use_text=use_text, job_id=job_id)
     return [Grant.from_scraper_dict(grant_dict) for grant_dict in grant_dicts]
 
 
 def save_grants_to_db(
-    page: Page, grant_links: list[dict[str, str]], use_text: bool = True
+    page: Page,
+    grant_links: list[dict[str, str]],
+    use_text: bool = True,
+    job_id: str | None = None,
 ) -> list["Grant"]:
     """Scrape grant details and save them to the database.
 
@@ -316,6 +384,7 @@ def save_grants_to_db(
         page: Playwright page object
         grant_links: List of grant link dictionaries with 'url' and 'button_text'
         use_text: If True, extract clean text (recommended for LLM). If False, extract HTML.
+        job_id: Optional job ID for status tracking
 
     Returns:
         List of saved Grant SQLAlchemy model instances
@@ -325,13 +394,36 @@ def save_grants_to_db(
     logger.info(f"Extracting details for {len(grant_links)} grants...")
 
     # Get grant details as model instances
-    grant_models = get_grant_details_as_models(page, grant_links, use_text=use_text)
+    grant_models = get_grant_details_as_models(
+        page, grant_links, use_text=use_text, job_id=job_id
+    )
 
     logger.info(f"Saving {len(grant_models)} grants to database...")
+
+    # Update status if job_id provided
+    if job_id:
+        from app.services.refresh_status import RefreshPhase, update_refresh_status
+
+        update_refresh_status(
+            job_id,
+            RefreshPhase.SAVING_TO_DB,
+            total_found=len(grant_models),
+            grants_saved=0,
+            message=f"Saving {len(grant_models)} grants to database",
+        )
 
     # Save to database (create or update by URL)
     with get_db_session() as db:
         saved_grants = GrantAccess.create_or_update_many_by_url(db, grant_models)
+
+    # Update final save count
+    if job_id:
+        update_refresh_status(
+            job_id,
+            RefreshPhase.SAVING_TO_DB,
+            grants_saved=len(saved_grants),
+            message=f"Successfully saved {len(saved_grants)} grants",
+        )
 
     logger.info(f"Successfully saved {len(saved_grants)} grants")
     return saved_grants
@@ -489,7 +581,9 @@ def scrape_and_refresh_grants(
                         message="Saving grants to database",
                     )
                 try:
-                    saved_grants = save_grants_to_db(page, grant_links, use_text=True)
+                    saved_grants = save_grants_to_db(
+                        page, grant_links, use_text=True, job_id=job_id
+                    )
                     grants_saved = len(saved_grants)
                     logger.info(f"Successfully saved {grants_saved} grants to database")
                 except Exception as e:

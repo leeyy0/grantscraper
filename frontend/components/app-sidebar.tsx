@@ -49,25 +49,25 @@ const data = {
       icon: IconListDetails,
     },
     {
-      title: "Results",
-      url: "/results",
+      title: "Grants",
+      url: "/grants",
       icon: IconReport,
     },
   ],
   navSecondary: [
     {
       title: "Settings",
-      url: "/settings",
+      url: "",
       icon: IconSettings,
     },
     {
       title: "Get Help",
-      url: "/help",
+      url: "",
       icon: IconHelp,
     },
     {
       title: "Search",
-      url: "/search",
+      url: "",
       icon: IconSearch,
     },
   ],

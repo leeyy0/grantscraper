@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
-import { useSSE } from "react-eventsource"
+import { useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -24,73 +23,78 @@ const BACKEND_API_URL =
 
 export function PipelineStatus() {
   const { pipelineStatus, updatePipelineStatus, clearPipeline } = usePipeline()
+  const eventSourceRef = useRef<EventSource | null>(null)
 
-  // Determine if we should connect to SSE
-  const shouldConnect =
-    pipelineStatus.initiative_id &&
-    pipelineStatus.status !== "idle" &&
-    pipelineStatus.status !== "completed" &&
-    pipelineStatus.status !== "error"
+  useEffect(() => {
+    // Only connect when we have an initiative and pipeline is running
+    const shouldConnect =
+      pipelineStatus.initiative_id &&
+      pipelineStatus.status !== "idle" &&
+      pipelineStatus.status !== "completed" &&
+      pipelineStatus.status !== "error"
 
-  // Build SSE URL dynamically (empty string disables connection)
-  const sseUrl: string = shouldConnect
-    ? `${BACKEND_API_URL}/pipeline/get-status-stream/${pipelineStatus.initiative_id}`
-    : ""
+    if (!shouldConnect) {
+      // Clean up existing connection if status changed
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+      return
+    }
 
-  // Use react-eventsource hook
-  const { readyState, close } = useSSE({
-    url: sseUrl,
-    onMessage: (message) => {
+    // Create SSE connection
+    const sseUrl = `${BACKEND_API_URL}/pipeline/get-status-stream/${pipelineStatus.initiative_id}`
+    const eventSource = new EventSource(sseUrl)
+    eventSourceRef.current = eventSource
+
+    eventSource.onmessage = (event) => {
       try {
-        const parsedData = JSON.parse(message.data)
+        const parsedData = JSON.parse(event.data)
         updatePipelineStatus(parsedData)
 
         // Show toast on completion
         if (parsedData.status === "completed") {
           toast.success("Pipeline completed!", {
-            description:
-              parsedData.message || "All grants have been analyzed",
+            description: parsedData.message || "All grants have been analyzed",
           })
         } else if (parsedData.status === "error") {
           toast.error("Pipeline failed", {
-            description:
-              parsedData.error || "An error occurred during processing",
+            description: parsedData.error || "An error occurred during processing",
           })
         }
       } catch (error) {
         console.error("Failed to parse SSE message:", error)
       }
-    },
-    onError: (error) => {
+    }
+
+    eventSource.onerror = (error) => {
       console.error("SSE connection error:", error)
       updatePipelineStatus({
         status: "error",
         error: "Connection to pipeline status stream failed",
       })
-    },
-  })
-
-  // Close connection when pipeline completes or errors
-  useEffect(() => {
-    if (
-      pipelineStatus.status === "completed" ||
-      pipelineStatus.status === "error"
-    ) {
-      close()
+      eventSource.close()
     }
-  }, [pipelineStatus.status, close])
 
+    // Cleanup function
+    return () => {
+      eventSource.close()
+      eventSourceRef.current = null
+    }
+  }, [pipelineStatus.initiative_id, pipelineStatus.status, updatePipelineStatus])
+
+  // Rest of your component remains the same...
   if (pipelineStatus.status === "idle" || !pipelineStatus.initiative_id) {
     return null
   }
 
   const getStatusIcon = () => {
     switch (pipelineStatus.status) {
-      case "calculating_phase1":
+      case "calculating":
         return <Search className="h-5 w-5" />
       case "filtering":
         return <FileSearch className="h-5 w-5" />
-      case "scraping_phase2":
+      case "deep_scraping":
         return <Loader2 className="h-5 w-5 animate-spin" />
       case "analyzing":
         return <Brain className="h-5 w-5" />
@@ -105,11 +109,11 @@ export function PipelineStatus() {
 
   const getStatusText = () => {
     switch (pipelineStatus.status) {
-      case "calculating_phase1":
+      case "calculating":
         return "Calculating preliminary ratings..."
       case "filtering":
         return "Filtering grants..."
-      case "scraping_phase2":
+      case "deep_scraping":
         return "Deep scraping filtered grants..."
       case "analyzing":
         return "Analyzing with AI..."
@@ -135,15 +139,17 @@ export function PipelineStatus() {
 
   const getProgress = () => {
     if (pipelineStatus.total_grants && pipelineStatus.processed_grants) {
-      return (pipelineStatus.processed_grants / pipelineStatus.total_grants) * 100
+      return (
+        (pipelineStatus.processed_grants / pipelineStatus.total_grants) * 100
+      )
     }
     // Estimate progress based on status
     switch (pipelineStatus.status) {
-      case "calculating_phase1":
+      case "calculating":
         return 10
       case "filtering":
         return 30
-      case "scraping_phase2":
+      case "deep_scraping":
         return 50
       case "analyzing":
         return 75
@@ -165,7 +171,7 @@ export function PipelineStatus() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 -mt-1 -mr-1"
+            className="-mt-1 -mr-1 h-6 w-6"
             onClick={clearPipeline}
           >
             <X className="h-4 w-4" />
@@ -174,7 +180,7 @@ export function PipelineStatus() {
       </CardHeader>
       <CardContent className="space-y-3">
         <div>
-          <p className="text-sm font-medium mb-1">
+          <p className="mb-1 text-sm font-medium">
             {pipelineStatus.initiative_title}
           </p>
           <Badge variant={getStatusColor()} className="text-xs">
@@ -184,10 +190,29 @@ export function PipelineStatus() {
 
         <Progress value={getProgress()} className="h-2" />
 
-        <div className="space-y-1 text-xs text-muted-foreground">
+        <div className="text-muted-foreground space-y-1 text-xs">
+          {pipelineStatus.status === "calculating" && (
+            <div className="mb-2 rounded bg-blue-50 p-2 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              <p className="text-xs">
+                Phase 1: Quick preliminary screening of all grants
+              </p>
+            </div>
+          )}
+          {(pipelineStatus.status === "deep_scraping" ||
+            pipelineStatus.status === "analyzing") && (
+            <div className="mb-2 rounded bg-purple-50 p-2 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+              <p className="text-xs">
+                Phase 2: Deep analysis of filtered grants
+              </p>
+            </div>
+          )}
           {pipelineStatus.total_grants && (
             <div className="flex justify-between">
-              <span>Total grants:</span>
+              <span>
+                {pipelineStatus.status === "calculating"
+                  ? "Screening:"
+                  : "Filtered grants:"}
+              </span>
               <span className="font-medium">{pipelineStatus.total_grants}</span>
             </div>
           )}
@@ -209,7 +234,11 @@ export function PipelineStatus() {
           )}
           {pipelineStatus.remaining_calls !== undefined && (
             <div className="flex justify-between">
-              <span>API calls remaining:</span>
+              <span>
+                {pipelineStatus.status === "calculating"
+                  ? "Preliminary scraping calls left:"
+                  : "API calls remaining:"}
+              </span>
               <span className="font-medium">
                 {pipelineStatus.remaining_calls}
               </span>
@@ -218,13 +247,13 @@ export function PipelineStatus() {
         </div>
 
         {pipelineStatus.message && (
-          <p className="text-xs text-muted-foreground pt-2 border-t">
+          <p className="text-muted-foreground border-t pt-2 text-xs">
             {pipelineStatus.message}
           </p>
         )}
 
         {pipelineStatus.error && (
-          <p className="text-xs text-red-500 pt-2 border-t">
+          <p className="border-t pt-2 text-xs text-red-500">
             Error: {pipelineStatus.error}
           </p>
         )}

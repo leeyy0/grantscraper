@@ -116,9 +116,9 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                 grant_info_dict = {
                     "id": grant.id,
                     "name": grant.name,
+                    "issuer": grant.issuer,
                     "url": grant.url,
                     "card_body_text": grant.card_body_text,
-                    "details": grant.details,
                 }
 
                 # Call Gemini API for preliminary rating
@@ -255,9 +255,9 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     grant_info = {
                         "id": grant.id,
                         "name": grant.name,
+                        "issuer": grant.issuer,
                         "url": grant.url,
                         "card_body_text": grant.card_body_text,
-                        "details": grant.details,
                     }
 
                     # Get preliminary rating (Already in DB from Phase 1)

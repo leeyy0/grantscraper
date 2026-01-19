@@ -22,9 +22,9 @@ class Grant(Base):
     __tablename__ = "grants"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(Text, nullable=True)  # Can be derived from button_text
+    issuer = Column(Text, nullable=True)
+    name = Column(Text, nullable=False)
     url = Column(Text, nullable=False)
-    details = Column(Text, nullable=True)  # Legacy field, can store card_body_text/html
     button_text = Column(Text, nullable=True)  # Button text from listing page
     card_body_text = Column(Text, nullable=True)  # Clean text content (for LLM)
     card_body_html = Column(Text, nullable=True)  # HTML content (if use_text=False)
@@ -38,28 +38,35 @@ class Grant(Base):
         """Create a Grant instance from a dictionary returned by get_grant_details().
 
         Args:
-            grant_dict: Dictionary with keys: url, button_text, card_body_text/card_body_html, links
+            grant_dict: Dictionary with keys: url, button_text, card_body_text/card_body_html,
+                       links, issuer, title
 
         Returns:
             Grant instance (not yet persisted to database)
         """
-        # Use button_text as name if available, otherwise extract from URL
-        name = grant_dict.get("button_text")
+        # Use title as name (primary source), with fallbacks
+        name = grant_dict.get("title")
         if not name:
-            # Fallback: extract grant ID from URL
+            # Fallback 1: Use button_text
+            name = grant_dict.get("button_text")
+        if not name:
+            # Fallback 2: extract grant ID from URL
             url_parts = grant_dict.get("url", "").split("/")
             if len(url_parts) >= 2:
                 name = (
                     url_parts[-2] if url_parts[-1] == "instruction" else url_parts[-1]
                 )
+        if not name:
+            # Fallback 3: Use a default value to ensure non-null
+            name = "Unknown Grant"
 
-        # Store card_body_text in details for backward compatibility
-        details = grant_dict.get("card_body_text") or grant_dict.get("card_body_html")
+        # Use issuer from scraper (can be None/null if not found)
+        issuer = grant_dict.get("issuer") or None
 
         return cls(
+            issuer=issuer,
             name=name,
             url=grant_dict.get("url"),
-            details=details,
             button_text=grant_dict.get("button_text"),
             card_body_text=grant_dict.get("card_body_text"),
             card_body_html=grant_dict.get("card_body_html"),
