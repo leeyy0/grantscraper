@@ -27,32 +27,19 @@ logger = logging.getLogger(__name__)
 # File structure paths
 BASE_DIR = Path(__file__).parent.parent.parent
 DOWNLOADS_DIR = BASE_DIR / "downloads"
-INITIAL_SCRAPE_DIR = DOWNLOADS_DIR / "initial_scrape"
 DEEP_SCRAPE_DIR = DOWNLOADS_DIR / "deep_scrape"
 
 # Ensure directories exist
 DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
-INITIAL_SCRAPE_DIR.mkdir(parents=True, exist_ok=True)
 DEEP_SCRAPE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Threshold for filtering grants in Phase 2
-RATING_THRESHOLD = 50  # Can be made configurable
+RATING_THRESHOLD = 61
 
 
 def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
     """
-    Run the complete grant filtering pipeline.
-
-    Steps:
-    1. Read initiative from DB (Step 3 from requirements)
-    2. Get all grants from DB
-    3. Phase 1: Calculate preliminary ratings (Step 4)
-    4. Phase 2: Deep scrape and analyze grants above threshold (Steps 5-7)
-    5. Save results to DB
-
-    Args:
-        initiative_id: ID of the initiative to filter grants for
-        threshold: Minimum preliminary rating for deep analysis (default: 50)
+    Run the complete grant filtering pipeline using standard Gemini API calls.
     """
     logger.info(
         f"Starting pipeline for initiative {initiative_id} with threshold {threshold}"
@@ -60,33 +47,25 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
 
     try:
         with get_db_session() as db:
-            # Step 1: Read initiative and organization (Step 3 from requirements)
+            # Step 1: Read initiative and organization
             logger.info(f"Loading initiative {initiative_id} and organization...")
             initiative = InitiativeAccess.get_by_id(db, initiative_id)
             if not initiative:
                 error_msg = f"Initiative {initiative_id} not found"
                 logger.error(error_msg)
-                update_status(
-                    initiative_id,
-                    PipelinePhase.ERROR,
-                    error=error_msg,
-                )
+                update_status(initiative_id, PipelinePhase.ERROR, error=error_msg)
                 return
 
             org = OrganisationAccess.get_by_id(db, initiative.organisation_id)
             if not org:
                 error_msg = f"Organization for initiative {initiative_id} not found"
                 logger.error(error_msg)
-                update_status(
-                    initiative_id,
-                    PipelinePhase.ERROR,
-                    error=error_msg,
-                )
+                update_status(initiative_id, PipelinePhase.ERROR, error=error_msg)
                 return
 
             logger.info(f"Loaded organization: {org.name}")
 
-            # Convert to dicts for easier handling
+            # Context Dicts
             org_info = {
                 "id": org.id,
                 "name": org.name,
@@ -112,19 +91,17 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
             if not grants:
                 error_msg = "No grants found in database"
                 logger.error(error_msg)
-                update_status(
-                    initiative_id,
-                    PipelinePhase.ERROR,
-                    error=error_msg,
-                )
+                update_status(initiative_id, PipelinePhase.ERROR, error=error_msg)
                 return
 
             logger.info(
                 f"Processing {len(grants)} grants for initiative {initiative_id}"
             )
 
-            # Step 3: Phase 1 - Preliminary ratings (Step 4 from requirements)
-            logger.info("Phase 1: Starting preliminary rating calculations...")
+            # =================================================================
+            # Step 3: Phase 1 - Preliminary ratings (STANDARD API CALLS)
+            # =================================================================
+            logger.info("Phase 1: Starting Preliminary Analysis...")
             update_status(
                 initiative_id,
                 PipelinePhase.PHASE_1_CALCULATING,
@@ -132,7 +109,11 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
             )
 
             for idx, grant in enumerate(grants):
-                grant_info = {
+                logger.info(
+                    f"Preliminary analysis {idx + 1}/{len(grants)}: {grant.name} (ID: {grant.id})"
+                )
+
+                grant_info_dict = {
                     "id": grant.id,
                     "name": grant.name,
                     "url": grant.url,
@@ -140,20 +121,15 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     "details": grant.details,
                 }
 
-                logger.debug(
-                    f"Calculating preliminary rating for grant {grant.id}: {grant.name}"
-                )
-
-                # Calculate preliminary rating
+                # Call Gemini API for preliminary rating
                 prelim_rating = analyze_grant_preliminary(
-                    grant_info, org_info, initiative_info
+                    grant_info_dict, org_info, initiative_info
                 )
 
-                logger.debug(f"Grant {grant.id} preliminary rating: {prelim_rating}")
+                logger.info(f"Grant {grant.id} preliminary rating: {prelim_rating}")
 
-                # Save or update Result with preliminary rating
+                # Save/Update Result
                 result = ResultAccess.get_by_ids(db, grant.id, initiative_id)
-
                 if result:
                     result.prelim_rating = prelim_rating
                     ResultAccess.update(db, result)
@@ -170,9 +146,12 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                     initiative_id,
                     PipelinePhase.PHASE_1_CALCULATING,
                     remaining_calls=len(grants) - idx - 1,
+                    total_grants=len(grants),
+                    current_grant=idx + 1,
                 )
 
-            logger.info("Phase 1 completed: All preliminary ratings calculated")
+            logger.info("Phase 1 completed: All preliminary ratings saved.")
+            # =================================================================
 
             # Step 4: Filter grants above threshold
             logger.info(f"Filtering grants above threshold {threshold}...")
@@ -197,7 +176,7 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                 )
                 return
 
-            # Step 5: Phase 2 - Deep scraping (Step 5 from requirements)
+            # Step 5: Phase 2 - Deep scraping
             logger.info("Phase 2: Starting deep scraping...")
             update_status(
                 initiative_id,
@@ -230,7 +209,7 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
 
             logger.info("Phase 2: Deep scraping completed")
 
-            # Step 6: Download files and analyze with Gemini (Steps 6-7 from requirements)
+            # Step 6: Download files and analyze with Gemini
             logger.info("Phase 2: Starting detailed analysis with Gemini...")
             update_status(
                 initiative_id,
@@ -281,7 +260,7 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                         "details": grant.details,
                     }
 
-                    # Get preliminary rating
+                    # Get preliminary rating (Already in DB from Phase 1)
                     result = ResultAccess.get_by_ids(db, grant.id, initiative_id)
                     prelim_rating = result.prelim_rating if result else 50
 
@@ -311,7 +290,7 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
                         f"Uncertainty: {result_obj.uncertainty_rating}%"
                     )
 
-                    # Update status (return index of grant + 1 as per requirements)
+                    # Update status
                     update_status(
                         initiative_id,
                         PipelinePhase.PHASE_2_ANALYZING,
@@ -335,12 +314,10 @@ def run_pipeline(initiative_id: int, threshold: int = RATING_THRESHOLD) -> None:
             )
 
     except Exception as e:
+        # Logs the full stack trace automatically via exc_info=True
         logger.error(
             f"Error in pipeline for initiative {initiative_id}: {e}", exc_info=True
         )
-        import traceback
-
-        traceback.print_exc()
         update_status(
             initiative_id,
             PipelinePhase.ERROR,
