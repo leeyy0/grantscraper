@@ -1,15 +1,25 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getGrantById, type GrantDetail } from "@/lib/grant-data"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { getGrantById } from "@/lib/grant-data"
 import { getRatingColor } from "@/lib/utils"
 
 function formatDeadline(deadline: string | null): string {
   if (!deadline) return "No deadline specified"
   try {
     const date = new Date(deadline)
-    return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
   } catch {
     return deadline
   }
@@ -19,7 +29,9 @@ interface GrantDetailPageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function GrantDetailPage({ params }: GrantDetailPageProps) {
+export default async function GrantDetailPage({
+  params,
+}: GrantDetailPageProps) {
   const { id } = await params
   const grant = getGrantById(id)
 
@@ -28,8 +40,8 @@ export default async function GrantDetailPage({ params }: GrantDetailPageProps) 
   }
 
   return (
-    <main className="min-h-screen bg-background py-12 px-4">
-      <div className="max-w-4xl mx-auto">
+    <main className="bg-background min-h-screen px-4 py-12">
+      <div className="mx-auto max-w-4xl">
         <div className="mb-6">
           <Link href="/">
             <Button variant="outline" className="mb-4">
@@ -38,26 +50,38 @@ export default async function GrantDetailPage({ params }: GrantDetailPageProps) 
           </Link>
         </div>
 
-        <Card className="border border-border">
+        <Card className="border-border border">
           <CardHeader>
-            <div className="flex justify-between items-start mb-4">
+            <div className="mb-4 flex items-start justify-between">
               <div>
-                <CardTitle className="text-3xl mb-2">{grant.grant_name}</CardTitle>
-                <CardDescription className="text-lg">{grant.grant_description}</CardDescription>
+                <CardTitle className="mb-2 text-3xl">
+                  {grant.grant_name}
+                </CardTitle>
+                <CardDescription className="text-lg">
+                  {grant.grant_description}
+                </CardDescription>
               </div>
             </div>
 
             {/* Match and Uncertainty ratings */}
-            <div className="flex gap-8 mt-4">
+            <div className="mt-4 flex gap-8">
               <div className="flex flex-col">
-                <span className="text-sm text-muted-foreground">Match Rating</span>
-                <span className={`text-4xl font-bold ${getRatingColor(grant.match_rating)}`}>
+                <span className="text-muted-foreground text-sm">
+                  Match Rating
+                </span>
+                <span
+                  className={`text-4xl font-bold ${getRatingColor(grant.match_rating)}`}
+                >
                   {grant.match_rating}%
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-sm text-muted-foreground">Uncertainty Rating</span>
-                <span className={`text-4xl font-bold ${getRatingColor(grant.uncertainty_rating, true)}`}>
+                <span className="text-muted-foreground text-sm">
+                  Uncertainty Rating
+                </span>
+                <span
+                  className={`text-4xl font-bold ${getRatingColor(grant.uncertainty_rating, true)}`}
+                >
                   {grant.uncertainty_rating}%
                 </span>
               </div>
@@ -66,36 +90,54 @@ export default async function GrantDetailPage({ params }: GrantDetailPageProps) 
 
           <CardContent className="space-y-6">
             {/* Grant Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div className="space-y-1">
-                <span className="text-sm font-medium text-muted-foreground">Grant Amount</span>
+                <span className="text-muted-foreground text-sm font-medium">
+                  Grant Amount
+                </span>
                 <p className="text-lg font-semibold">{grant.grant_amount}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-sm font-medium text-muted-foreground">Sponsors</span>
+                <span className="text-muted-foreground text-sm font-medium">
+                  Sponsors
+                </span>
                 <p className="text-lg font-semibold">{grant.grant_sponsors}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-sm font-medium text-muted-foreground">Deadline</span>
-                <p className="text-lg font-semibold">{formatDeadline(grant.deadline)}</p>
+                <span className="text-muted-foreground text-sm font-medium">
+                  Deadline
+                </span>
+                <p className="text-lg font-semibold">
+                  {formatDeadline(grant.deadline)}
+                </p>
               </div>
             </div>
 
             {/* Explanations */}
-            <div className="space-y-4 pt-4 border-t border-border">
+            <div className="border-border space-y-4 border-t pt-4">
               <div>
-                <h3 className="text-lg font-semibold mb-2">Match Rating Explanation</h3>
-                <p className="text-muted-foreground">{grant.explanations.match_rating}</p>
+                <h3 className="mb-2 text-lg font-semibold">
+                  Match Rating Explanation
+                </h3>
+                <p className="text-muted-foreground">
+                  {grant.explanations.match_rating}
+                </p>
               </div>
               <div>
-                <h3 className="text-lg font-semibold mb-2">Uncertainty Rating Explanation</h3>
-                <p className="text-muted-foreground">{grant.explanations.uncertainty_rating}</p>
+                <h3 className="mb-2 text-lg font-semibold">
+                  Uncertainty Rating Explanation
+                </h3>
+                <p className="text-muted-foreground">
+                  {grant.explanations.uncertainty_rating}
+                </p>
               </div>
             </div>
 
             {/* Eligibility Criteria */}
-            <div className="pt-4 border-t border-border">
-              <h3 className="text-lg font-semibold mb-4">Eligibility Criteria</h3>
+            <div className="border-border border-t pt-4">
+              <h3 className="mb-4 text-lg font-semibold">
+                Eligibility Criteria
+              </h3>
               <ul className="space-y-2">
                 {grant.criteria.map((criterion, index) => (
                   <li key={index} className="flex items-start gap-2">
@@ -108,8 +150,8 @@ export default async function GrantDetailPage({ params }: GrantDetailPageProps) 
 
             {/* Sources */}
             {grant.sources.length > 0 && (
-              <div className="pt-4 border-t border-border">
-                <h3 className="text-lg font-semibold mb-4">Sources & Links</h3>
+              <div className="border-border border-t pt-4">
+                <h3 className="mb-4 text-lg font-semibold">Sources & Links</h3>
                 <ul className="space-y-2">
                   {grant.sources.map((source, index) => (
                     <li key={index}>

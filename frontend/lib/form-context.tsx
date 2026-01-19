@@ -1,13 +1,19 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from "react"
-import type { OrganizationFormInput } from "@/components/organization-form"
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react"
+import type { OrganisationFormInput } from "@/components/organisation-form"
 import type { InitiativeFormInput } from "@/components/initiative-form"
 import type { GrantResult } from "@/components/grants-results"
 
 interface FormContextType {
-  organizationForm: OrganizationFormInput
-  setOrganizationForm: (data: OrganizationFormInput) => void
+  organisationForm: OrganisationFormInput
+  setOrganisationForm: (data: OrganisationFormInput) => void
   initiativeForm: InitiativeFormInput
   setInitiativeForm: (data: InitiativeFormInput) => void
   showResults: boolean
@@ -23,7 +29,7 @@ const FormContext = createContext<FormContextType | undefined>(undefined)
 const STORAGE_KEY = "form-context-state"
 
 interface PersistedState {
-  organizationForm: OrganizationFormInput
+  organisationForm: OrganisationFormInput
   initiativeForm: InitiativeFormInput
   showResults: boolean
   grantResults: GrantResult[]
@@ -33,7 +39,7 @@ interface PersistedState {
 function getInitialState(): PersistedState {
   if (typeof window === "undefined") {
     return {
-      organizationForm: {
+      organisationForm: {
         name: "",
         mission_and_focus: "",
         about_us: "",
@@ -50,7 +56,7 @@ function getInitialState(): PersistedState {
       },
       showResults: false,
       grantResults: [],
-      accordionValue: ["organization", "initiative"],
+      accordionValue: ["organisation", "initiative"],
     }
   }
 
@@ -64,7 +70,7 @@ function getInitialState(): PersistedState {
   }
 
   return {
-    organizationForm: {
+    organisationForm: {
       name: "",
       mission_and_focus: "",
       about_us: "",
@@ -81,68 +87,52 @@ function getInitialState(): PersistedState {
     },
     showResults: false,
     grantResults: [],
-    accordionValue: ["organization", "initiative"],
+    accordionValue: ["organisation", "initiative"],
   }
 }
 
 export function FormProvider({ children }: { children: ReactNode }) {
-  const initialized = useRef(false)
-
-  const [organizationForm, setOrganizationForm] = useState<OrganizationFormInput>({
-    name: "",
-    mission_and_focus: "",
-    about_us: "",
-    remarks: "",
-  })
-
-  const [initiativeForm, setInitiativeForm] = useState<InitiativeFormInput>({
-    title: "",
-    goals_objective: "",
-    audience_beneficiaries: "",
-    estimated_cost: "",
-    stage_of_initiative: "",
-    demographic: "",
-    remarks: "",
-  })
-
-  const [showResults, setShowResults] = useState(false)
-  const [grantResults, setGrantResults] = useState<GrantResult[]>([])
-  const [accordionValue, setAccordionValue] = useState<string[]>(["organization", "initiative"])
+  const [organisationForm, setOrganisationForm] =
+    useState<OrganisationFormInput>(() => getInitialState().organisationForm)
+  const [initiativeForm, setInitiativeForm] = useState<InitiativeFormInput>(
+    () => getInitialState().initiativeForm,
+  )
+  const [showResults, setShowResults] = useState(
+    () => getInitialState().showResults,
+  )
+  const [grantResults, setGrantResults] = useState<GrantResult[]>(
+    () => getInitialState().grantResults,
+  )
+  const [accordionValue, setAccordionValue] = useState<string[]>(
+    () => getInitialState().accordionValue,
+  )
 
   useEffect(() => {
-    if (!initialized.current) {
-      const storedState = getInitialState()
-      setOrganizationForm(storedState.organizationForm)
-      setInitiativeForm(storedState.initiativeForm)
-      setShowResults(storedState.showResults)
-      setGrantResults(storedState.grantResults)
-      setAccordionValue(storedState.accordionValue)
-      initialized.current = true
+    const state: PersistedState = {
+      organisationForm,
+      initiativeForm,
+      showResults,
+      grantResults,
+      accordionValue,
     }
-  }, [])
-
-  useEffect(() => {
-    if (initialized.current) {
-      const state: PersistedState = {
-        organizationForm,
-        initiativeForm,
-        showResults,
-        grantResults,
-        accordionValue,
-      }
-      try {
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-      } catch (e) {
-        console.error("Failed to save state:", e)
-      }
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    } catch (e) {
+      console.error("Failed to save state:", e)
     }
-  }, [organizationForm, initiativeForm, showResults, grantResults, accordionValue])
+  }, [
+    organisationForm,
+    initiativeForm,
+    showResults,
+    grantResults,
+    accordionValue,
+  ])
 
   return (
     <FormContext.Provider
       value={{
-        organizationForm,
-        setOrganizationForm,
+        organisationForm,
+        setOrganisationForm,
         initiativeForm,
         setInitiativeForm,
         showResults,
