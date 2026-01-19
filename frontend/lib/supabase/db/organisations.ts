@@ -45,7 +45,10 @@ export async function getWithInitiatives(
     .eq("id", id)
     .single()
 
-  return { data: data as any, error }
+  return {
+    data: data as (Organisation & { initiatives: Initiative[] }) | null,
+    error,
+  }
 }
 
 /**

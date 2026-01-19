@@ -8,15 +8,15 @@ export default function GrantNotFound() {
       <div className="mx-auto max-w-2xl">
         <Card className="border-border border">
           <CardHeader>
-            <CardTitle className="text-2xl">Grant Not Found</CardTitle>
+            <CardTitle className="text-2xl">Resource Not Found</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              The grant you&apos;re looking for doesn&apos;t exist or may have
-              been removed.
+              The resource you&apos;re looking for doesn&apos;t exist or may
+              have been removed.
             </p>
             <Link href="/">
-              <Button>Back to Results</Button>
+              <Button>Back to Dashboard</Button>
             </Link>
           </CardContent>
         </Card>

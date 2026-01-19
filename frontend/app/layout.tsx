@@ -2,8 +2,12 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { FormProvider } from "@/lib/form-context"
+import { PipelineProvider } from "@/lib/pipeline-context"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
+import { AppSidebar } from "@/components/app-sidebar"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { SiteHeader } from "@/components/site-header"
 
 export const metadata: Metadata = {
   title: "Tsao Foundation's Grants Analyser",
@@ -39,9 +43,24 @@ export default function RootLayout({
         <link rel="manifest" href="/site.webmanifest" />
       </head>
       <body className={`font-sans antialiased`}>
-        <FormProvider>{children}</FormProvider>
-        <Analytics />
-        <Toaster richColors />
+        <PipelineProvider>
+          <SidebarProvider
+            style={
+              {
+                "--sidebar-width": "calc(var(--spacing) * 72)",
+                "--header-height": "calc(var(--spacing) * 12)",
+              } as React.CSSProperties
+            }
+          >
+            <AppSidebar variant="inset" />
+            <SidebarInset>
+              <SiteHeader />
+              <FormProvider>{children}</FormProvider>
+              <Analytics />
+              <Toaster richColors />
+            </SidebarInset>
+          </SidebarProvider>
+        </PipelineProvider>
       </body>
     </html>
   )

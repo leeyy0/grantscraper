@@ -59,7 +59,10 @@ export async function getWithOrganisation(
     .eq("id", id)
     .single()
 
-  return { data: data as any, error }
+  return {
+    data: data as (Initiative & { organisations: Organisation }) | null,
+    error,
+  }
 }
 
 /**

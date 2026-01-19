@@ -6,22 +6,24 @@ import { Label } from "@/components/ui/label"
 
 export interface InitiativeFormInput {
   title: string
-  goals_objective: string
-  audience_beneficiaries: string
-  estimated_cost: string
-  stage_of_initiative: string
+  stage: string
+  audience: string
+  goals: string
+  costs: string
   demographic: string
   remarks: string
+  organisation_id: number
 }
 
 export interface InitiativeFormErrors {
   title?: string
-  goals_objective?: string
-  audience_beneficiaries?: string
-  estimated_cost?: string
-  stage_of_initiative?: string
+  stage?: string
+  audience?: string
+  goals?: string
+  costs?: string
   demographic?: string
   remarks?: string
+  organisation_id?: string
 }
 
 interface InitiativeFormProps {
@@ -38,11 +40,11 @@ export function InitiativeForm({
   return (
     <div className="space-y-4 pt-4">
       <div className="space-y-2">
-        <Label htmlFor="init-title">
+        <Label htmlFor="title">
           Title <span className="text-destructive">*</span>
         </Label>
         <Input
-          id="init-title"
+          id="title"
           placeholder="Enter initiative title"
           value={formData.title}
           onChange={(e) => onChange({ ...formData, title: e.target.value })}
@@ -53,80 +55,63 @@ export function InitiativeForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="goals">
-          Goals/ Objective of the Initiative{" "}
-          <span className="text-destructive">*</span>
+        <Label htmlFor="stage">
+          Stage <span className="text-destructive">*</span>
         </Label>
-        <Textarea
-          id="goals"
-          placeholder="Describe the goals and objectives"
-          className="min-h-60"
-          rows={3}
-          value={formData.goals_objective}
-          onChange={(e) =>
-            onChange({ ...formData, goals_objective: e.target.value })
-          }
+        <Input
+          id="stage"
+          placeholder="e.g., Planning, Active, Completed"
+          value={formData.stage}
+          onChange={(e) => onChange({ ...formData, stage: e.target.value })}
         />
-        {errors.goals_objective && (
-          <p className="text-destructive text-sm">{errors.goals_objective}</p>
+        {errors.stage && (
+          <p className="text-destructive text-sm">{errors.stage}</p>
         )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="audience">
-          Audience/ Target Beneficiaries{" "}
-          <span className="text-destructive">*</span>
+          Audience <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="audience"
+          placeholder="Target audience for this initiative"
+          value={formData.audience}
+          onChange={(e) => onChange({ ...formData, audience: e.target.value })}
+        />
+        {errors.audience && (
+          <p className="text-destructive text-sm">{errors.audience}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="goals">
+          Goals <span className="text-destructive">*</span>
         </Label>
         <Textarea
-          id="audience"
-          placeholder="Who will benefit from this initiative?"
-          className="min-h-60"
-          rows={2}
-          value={formData.audience_beneficiaries}
-          onChange={(e) =>
-            onChange({ ...formData, audience_beneficiaries: e.target.value })
-          }
+          id="goals"
+          placeholder="Describe the goals of this initiative"
+          className="min-h-32"
+          rows={4}
+          value={formData.goals}
+          onChange={(e) => onChange({ ...formData, goals: e.target.value })}
         />
-        {errors.audience_beneficiaries && (
-          <p className="text-destructive text-sm">
-            {errors.audience_beneficiaries}
-          </p>
+        {errors.goals && (
+          <p className="text-destructive text-sm">{errors.goals}</p>
         )}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="cost">
-          Estimated Cost of the Initiative in SGD (Optional)
-        </Label>
+        <Label htmlFor="costs">Estimated Costs (Optional)</Label>
         <Input
-          id="cost"
+          id="costs"
           type="number"
-          min={0}
-          placeholder="Enter estimated cost"
-          value={formData.estimated_cost}
-          onChange={(e) =>
-            onChange({ ...formData, estimated_cost: e.target.value })
-          }
+          placeholder="0"
+          value={formData.costs}
+          onChange={(e) => onChange({ ...formData, costs: e.target.value })}
         />
-        {errors.estimated_cost && (
-          <p className="text-destructive text-sm">{errors.estimated_cost}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="stage">Stage of Initiative (Optional)</Label>
-        <Input
-          id="stage"
-          placeholder="Enter stage of initiative"
-          value={formData.stage_of_initiative}
-          onChange={(e) =>
-            onChange({ ...formData, stage_of_initiative: e.target.value })
-          }
-        />
-        {errors.stage_of_initiative && (
-          <p className="text-destructive text-sm">
-            {errors.stage_of_initiative}
-          </p>
+        {errors.costs && (
+          <p className="text-destructive text-sm">{errors.costs}</p>
         )}
       </div>
 
@@ -134,7 +119,7 @@ export function InitiativeForm({
         <Label htmlFor="demographic">Demographic (Optional)</Label>
         <Input
           id="demographic"
-          placeholder="Enter target demographic"
+          placeholder="Target demographic"
           value={formData.demographic}
           onChange={(e) =>
             onChange({ ...formData, demographic: e.target.value })
@@ -143,12 +128,12 @@ export function InitiativeForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="init-remarks">Remarks (Optional)</Label>
+        <Label htmlFor="remarks">Remarks (Optional)</Label>
         <Textarea
-          id="init-remarks"
+          id="remarks"
+          className="min-h-24"
           placeholder="Any additional remarks"
-          className="min-h-60"
-          rows={2}
+          rows={3}
           value={formData.remarks}
           onChange={(e) => onChange({ ...formData, remarks: e.target.value })}
         />
