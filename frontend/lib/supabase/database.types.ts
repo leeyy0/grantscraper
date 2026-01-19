@@ -51,30 +51,30 @@ export type Database = {
           button_text: string | null
           card_body_html: string | null
           card_body_text: string | null
-          details: string | null
           id: number
+          issuer: string | null
           links: string[] | null
-          name: string | null
+          name: string
           url: string
         }
         Insert: {
           button_text?: string | null
           card_body_html?: string | null
           card_body_text?: string | null
-          details?: string | null
           id?: number
+          issuer?: string | null
           links?: string[] | null
-          name?: string | null
+          name: string
           url: string
         }
         Update: {
           button_text?: string | null
           card_body_html?: string | null
           card_body_text?: string | null
-          details?: string | null
           id?: number
+          issuer?: string | null
           links?: string[] | null
-          name?: string | null
+          name?: string
           url?: string
         }
         Relationships: []
@@ -351,3 +351,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

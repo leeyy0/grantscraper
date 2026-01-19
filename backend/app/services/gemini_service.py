@@ -97,9 +97,10 @@ Budget: ${initiative_info.get("costs") or 0:,}
 
 GRANT INFORMATION:
 Name: {grant_info.get("name", "N/A")}
+Issuer: {grant_info.get("issuer", "N/A")}
 URL: {grant_info.get("url", "N/A")}
 Details:
-{grant_info.get("card_body_text", grant_info.get("details", "N/A"))}
+{grant_info.get("card_body_text", "N/A")}
 
 Rate the relevance of this grant to this specific initiative on a scale of 0-100, where:
 - 0-20: Not relevant at all
@@ -196,9 +197,10 @@ Budget: ${initiative_info.get("costs") or 0:,}
 
 GRANT BASIC INFORMATION:
 Name: {grant_info.get("name", "N/A")}
+Issuer: {grant_info.get("issuer", "N/A")}
 URL: {grant_info.get("url", "N/A")}
 Basic Details:
-{grant_info.get("card_body_text", grant_info.get("details", "N/A"))}
+{grant_info.get("card_body_text", "N/A")}
 """
 
     parts = [text_content]

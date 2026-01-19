@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { FormProvider } from "@/lib/form-context"
 import { PipelineProvider } from "@/lib/pipeline-context"
+import { RefreshProvider } from "@/lib/refresh-context"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -44,22 +45,24 @@ export default function RootLayout({
       </head>
       <body className={`font-sans antialiased`}>
         <PipelineProvider>
-          <SidebarProvider
-            style={
-              {
-                "--sidebar-width": "calc(var(--spacing) * 72)",
-                "--header-height": "calc(var(--spacing) * 12)",
-              } as React.CSSProperties
-            }
-          >
-            <AppSidebar variant="inset" />
-            <SidebarInset>
-              <SiteHeader />
-              <FormProvider>{children}</FormProvider>
-              <Analytics />
-              <Toaster richColors />
-            </SidebarInset>
-          </SidebarProvider>
+          <RefreshProvider>
+            <SidebarProvider
+              style={
+                {
+                  "--sidebar-width": "calc(var(--spacing) * 72)",
+                  "--header-height": "calc(var(--spacing) * 12)",
+                } as React.CSSProperties
+              }
+            >
+              <AppSidebar variant="inset" />
+              <SidebarInset>
+                <SiteHeader />
+                <FormProvider>{children}</FormProvider>
+                <Analytics />
+                <Toaster richColors />
+              </SidebarInset>
+            </SidebarProvider>
+          </RefreshProvider>
         </PipelineProvider>
       </body>
     </html>

@@ -1,9 +1,11 @@
 """Grant management endpoints for scraping and refreshing grant data."""
 
 import asyncio
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.services.refresh_status import (
     RefreshPhase,
@@ -117,3 +119,64 @@ async def get_refresh_status_endpoint(job_id: str):
         logger.warning(f"Refresh job {job_id} failed: {status.get('error')}")
 
     return status
+
+
+@router.get("/refresh-status-stream/{job_id}")
+async def get_refresh_status_stream(job_id: str):
+    """
+    Server-Sent Events stream for real-time grant refresh status updates.
+
+    Sends updates whenever the refresh status changes.
+    When status is "completed" or "error", sends a final message and closes the stream.
+
+    Args:
+        job_id: The job ID returned from the /refresh endpoint
+
+    Returns:
+        Server-Sent Events stream with real-time status updates
+    """
+    logger.info(f"Starting SSE stream for refresh job {job_id}")
+
+    async def event_generator():
+        last_status = None
+        event_count = 0
+
+        while True:
+            status = get_refresh_status(job_id)
+
+            # If job not found, send error and close
+            if not status:
+                logger.warning(f"SSE: No status found for job {job_id}")
+                yield f"data: {json.dumps({'phase': 'error', 'error': 'Job not found'})}\n\n"
+                break
+
+            # Check if status changed
+            if status != last_status:
+                event_count += 1
+                logger.debug(
+                    f"SSE event #{event_count} for job {job_id}: Status changed"
+                )
+
+                phase = status.get("phase", "starting")
+
+                # Check for terminal states
+                if phase == RefreshPhase.COMPLETED.value:
+                    logger.info(f"Refresh job {job_id} completed. Closing SSE stream.")
+                    yield f"data: {json.dumps(status)}\n\n"
+                    break
+                elif phase == RefreshPhase.ERROR.value:
+                    logger.error(
+                        f"Refresh job {job_id} error: {status.get('error')}. "
+                        f"Closing SSE stream."
+                    )
+                    yield f"data: {json.dumps(status)}\n\n"
+                    break
+                else:
+                    # Send current status
+                    yield f"data: {json.dumps(status)}\n\n"
+
+                last_status = status
+
+            await asyncio.sleep(1)  # Check every second
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

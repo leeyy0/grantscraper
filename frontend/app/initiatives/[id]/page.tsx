@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft } from "lucide-react"
 import Link from "next/link"
 import * as initiativesDb from "@/lib/supabase/db/initiatives"
 import * as resultsDb from "@/lib/supabase/db/results"
@@ -41,7 +40,7 @@ export default function Page() {
       try {
         setLoading(true)
 
-        // Fetch initiative details
+        // Fetch initiative details (for the details card)
         const { data: initData, error: initError } =
           await initiativesDb.getById(Number(initiativeId))
 
@@ -86,54 +85,32 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div className="max-w-9xl mx-4 p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Loading...</CardTitle>
-            <CardDescription>Fetching grant records...</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Loading...</CardTitle>
+          <CardDescription>Fetching grant records...</CardDescription>
+        </CardHeader>
+      </Card>
     )
   }
 
   if (error) {
     return (
-      <div className="max-w-9xl mx-4 p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => router.back()}>Go Back</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Error</CardTitle>
+          <CardDescription>{error}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => router.back()}>Go Back</Button>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <main className="bg-background min-h-screen px-6 py-7">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-            className="h-8 w-8"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-semibold">
-              {initiative?.title || "Initiative"}
-            </h1>
-            <p className="text-muted-foreground">Grant Records</p>
-          </div>
-        </div>
-
-        <Card className="mb-6">
+    <>
+      <Card className="mb-6">
           <CardHeader>
             <CardTitle>Initiative Details</CardTitle>
           </CardHeader>
@@ -181,7 +158,7 @@ export default function Page() {
         ) : (
           <div className="flex flex-col gap-4">
             {results.map((result) => (
-              <Link key={result.grant_id} href={`/grant/${result.grant_id}`}>
+              <Link key={result.grant_id} href={`/initiatives/${initiativeId}/grants/${result.grant_id}`}>
                 <Card className="border-border hover:border-primary/50 cursor-pointer border transition-all hover:shadow-md">
                   <CardContent className="p-4">
                     <div className="mb-4 flex gap-6">
@@ -272,7 +249,6 @@ export default function Page() {
             ))}
           </div>
         )}
-      </div>
-    </main>
+    </>
   )
 }

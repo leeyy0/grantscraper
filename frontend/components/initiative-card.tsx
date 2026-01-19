@@ -115,7 +115,7 @@ export function InitiativeCard({ initiative, onDelete }: InitiativeCardProps) {
         description: "Analyzing grants for your initiative",
       })
 
-      const response = await triggerFilterGrants(initiative.id, 61)
+      await triggerFilterGrants(initiative.id, 61)
 
       // Start pipeline tracking in context
       startPipeline(initiative.id, initiative.title)
