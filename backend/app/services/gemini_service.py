@@ -46,7 +46,7 @@ if not api_key:
 client = genai.Client(api_key=api_key)
 
 # The model to use
-GEMINI_MODEL = "gemini-3-flash-preview"
+GEMINI_MODEL = "gemini-3-pro-preview"
 
 # Rate limiting
 if GEMINI_BILLING_TIER == "FREE":
