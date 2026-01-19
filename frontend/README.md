@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GrantScraper Frontend
 
-## Getting Started
+This is the frontend application for **GrantScraper**, built to help non-profit organisations "pull" relevant grant information from the OurSG portal. It interacts with the FastAPI backend to visualize real-time scraping status and AI-matched grant results.
 
-First, run the development server:
+## 🛠️ Frontend Tech Stack
 
+*   **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
+*   **Language**: TypeScript
+*   **Styling**: [TailwindCSS 4](https://tailwindcss.com/)
+*   **UI Library**: [shadcn/ui](https://ui.shadcn.com/) (based on Radix UI)
+*   **Icons**: Lucide React
+*   **Data Visualization**: Recharts
+*   **State/Data Fetching**: React Server Components & Client Hooks
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+*   Node.js 18.17 or later
+*   pnpm (recommended)
+
+### 2. Installation
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd frontend
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Configuration
+Create a `.env.local` file in the `frontend` directory with the following variables. 
+> **Note**: These connect the frontend to your Supabase instance and the local Backend API.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Backend API URL
+NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8000
+```
 
-## Learn More
+### 4. Running Locally
+Start the development server:
+```bash
+pnpm dev
+```
+Open [http://localhost:3000](http://localhost:3000) to view the application.
 
-To learn more about Next.js, take a look at the following resources:
+## 📂 Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+*   `app/`: Next.js App Router pages and layouts.
+    *   `configure/`: Organisation profile settings.
+    *   `grants/`: View all scraped grants and trigger refreshing.
+    *   `initiatives/`: Create and manage grant-seeking initiatives.
+    *   `results/`: View AI-matched results for initiatives.
+*   `components/`: Reusable React components.
+    *   `ui/`: Base UI components (buttons, inputs, etc.).
+*   `lib/`: Utilities and API clients (`backend.ts` for API calls).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🔑 Key Features
+*   **Dashboard**: Overview of current initiatives and grant matches.
+*   **Grant Refresh**: UI to trigger the backend scraper and view progress via real-time stream.
+*   **Relevance Matching**: Detailed view of why a grant was matched, including "Funding Quantum" and "KPIs".
