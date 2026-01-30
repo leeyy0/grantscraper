@@ -73,9 +73,11 @@ export function InitiativeForm({
         <Label htmlFor="audience">
           Audience <span className="text-destructive">*</span>
         </Label>
-        <Input
+        <Textarea
           id="audience"
           placeholder="Target audience for this initiative"
+          className="min-h-32"
+          rows={4}
           value={formData.audience}
           onChange={(e) => onChange({ ...formData, audience: e.target.value })}
         />

@@ -28,7 +28,6 @@ interface GrantCardProps {
 }
 
 function GrantCard({ grant }: GrantCardProps) {
-
   return (
     <Card className="flex h-full flex-col">
       <CardHeader>
@@ -56,13 +55,11 @@ function GrantCard({ grant }: GrantCardProps) {
       <CardContent className="flex flex-1 flex-col gap-3">
         <div className="space-y-2 text-sm">
           {grant.card_body_text && (
-            <p className="line-clamp-4 text-muted-foreground">
+            <p className="text-muted-foreground line-clamp-4">
               {grant.card_body_text}
             </p>
           )}
-          
-          
-          
+
           {grant.links && grant.links.length > 0 && (
             <div className="mt-2">
               <span className="text-xs font-semibold">Related Links:</span>
@@ -87,7 +84,7 @@ function GrantCard({ grant }: GrantCardProps) {
             href={grant.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-3 font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            className="border-input bg-background ring-offset-background hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border px-3 font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
           >
             View Full Details
             <ExternalLink className="h-5 w-5" />
@@ -133,7 +130,7 @@ export default function GrantsPage() {
     const storedRefresh = getStoredRefresh()
     if (storedRefresh && storedRefresh.job_id) {
       console.log(
-        `Found existing refresh job: ${storedRefresh.job_id}, resuming...`
+        `Found existing refresh job: ${storedRefresh.job_id}, resuming...`,
       )
       // Restore the refresh status - this will trigger SSE reconnection
       startRefresh(storedRefresh.job_id)
@@ -150,10 +147,10 @@ export default function GrantsPage() {
   const handleRefreshGrants = async () => {
     try {
       toast.info("Initiating scraper...")
-      
-      const response = await triggerRefreshGrants()
+
+      const response = await triggerRefreshGrants(false)
       startRefresh(response.job_id)
-      
+
       toast.success("Scraper started!", {
         description: "Check the status card for progress",
       })
@@ -164,22 +161,21 @@ export default function GrantsPage() {
       })
     }
   }
-  
 
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
         <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Loading grants...</p>
+          <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground text-sm">Loading grants...</p>
         </div>
       </div>
     )
   }
 
-  const isRefreshing = 
-    refreshStatus.status !== "idle" && 
-    refreshStatus.status !== "completed" && 
+  const isRefreshing =
+    refreshStatus.status !== "idle" &&
+    refreshStatus.status !== "completed" &&
     refreshStatus.status !== "error"
 
   return (
@@ -189,7 +185,7 @@ export default function GrantsPage() {
         <div className="flex flex-row justify-between">
           <div>
             <h1 className="text-3xl font-bold">All Grants</h1>
-            <p className="mt-2 text-muted-foreground">
+            <p className="text-muted-foreground mt-2">
               Browse through all available grants in our database
             </p>
             <div className="mt-2">
@@ -197,25 +193,25 @@ export default function GrantsPage() {
                 {grants.length} {grants.length === 1 ? "Grant" : "Grants"} Found
               </Badge>
             </div>
-
           </div>
           <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="default"
-                    className=""
-                    onClick={handleRefreshGrants}
-                    disabled={isRefreshing}
-                  >
-                    Refresh Grants
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>
-                    Triggers the scraper to check for updates at the OurSG Grants Portal
-                  </p>
-                </TooltipContent>
-              </Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="default"
+                className=""
+                onClick={handleRefreshGrants}
+                disabled={isRefreshing}
+              >
+                Refresh Grants
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>
+                Triggers the scraper to check for updates at the OurSG Grants
+                Portal
+              </p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

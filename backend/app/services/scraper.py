@@ -88,9 +88,9 @@ def extract_card_body_content(page: Page, url: str) -> str:
     Returns:
         HTML content of the card-body div as a string
     """
-    page.goto(url, wait_until="domcontentloaded")
+    page.goto(url, wait_until="domcontentloaded", timeout=5000)
     # Wait for the card-body to be attached to DOM (not necessarily visible)
-    page.wait_for_selector(".card-body", state="attached", timeout=60000)
+    page.wait_for_selector(".card-body", state="attached", timeout=5000)
     # Give it a moment to render
     page.wait_for_timeout(1000)
 
@@ -278,7 +278,7 @@ def get_grant_details(
 
     for idx, grant in enumerate(grant_links, start=1):
         print(f"Extracting content from: {grant['url']}")
-        
+
         # Update progress if job_id provided
         if job_id:
             update_refresh_status(
@@ -288,7 +288,7 @@ def get_grant_details(
                 current_grant=idx,
                 message=f"Scraping grant {idx} of {total_grants}",
             )
-        
+
         try:
             if use_text:
                 # Extract text, links, issuer, and title in a single page visit (more efficient)

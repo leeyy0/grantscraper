@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   InitiativeForm,
@@ -31,7 +31,7 @@ import type { Initiative } from "@/lib/supabase/db/types"
 import { toast } from "sonner"
 import { ChevronLeft } from "lucide-react"
 
-export default function Page() {
+function AddOrUpdateContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const initiativeId = searchParams.get("id")
@@ -358,5 +358,24 @@ export default function Page() {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-9xl mx-4 p-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Add or Edit Initiative</CardTitle>
+              <CardDescription>Loading...</CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      }
+    >
+      <AddOrUpdateContent />
+    </Suspense>
   )
 }
