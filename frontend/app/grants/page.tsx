@@ -148,7 +148,7 @@ export default function GrantsPage() {
     try {
       toast.info("Initiating scraper...")
 
-      const response = await triggerRefreshGrants(false)
+      const response = await triggerRefreshGrants()
       startRefresh(response.job_id)
 
       toast.success("Scraper started!", {
