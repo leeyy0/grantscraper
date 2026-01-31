@@ -57,7 +57,7 @@ export default function Home() {
             className="h-17 w-full items-center! justify-start border px-4 py-7 text-left"
           >
             <Settings className="h-6! w-6!" />
-            <span className="text-xl">
+            <span className="text-xl text-wrap">
               Configure your organisation&apos;s information here!
             </span>
           </Button>
