@@ -36,6 +36,7 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://localhost:3001",  # Alternative port
         "http://127.0.0.1:3001",
+        "https://grantgrunter.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, OPTIONS, etc.)
