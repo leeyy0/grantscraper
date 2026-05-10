@@ -1,10 +1,13 @@
 # GrantScraper
 
-> **Problem Statement for Tsao Foundation**
+> **Problem Statement from Tsao Foundation**
 >
 > "How might non-profit organisations **'pull' information about grants from OurSG grants portal** that are relevant to them according to key criteria including issue area, scope of grant, KPIs, funding quantum, application due date, etcs. so that they can strengthen their financial sustainability?"
 
 ---
+
+## A Video Demonstration
+[![Watch the video](https://img.youtube.com/vi/_-9u-mmi1j4/hqdefault.jpg)](https://www.youtube.com/watch?v=_-9u-mmi1j4)
 
 ## 📋 Comprehensive Description
 
@@ -52,10 +55,11 @@ The core "pull" mechanism is built on a robust Playwright-based scraper that ens
 *   **Smart Filtering**: automatically applies the "Organisation" filter to exclude individual grants.
 *   **Status Detection**: Parses grant cards to identify and exclude "Closed" or "Applications closed" grants.
 *   **Deep Extraction**: Visits each grant page to capture the full `card-body` text, including issuer details, funding quantum, and deadlines, preserving structure for AI analysis.
+*   **Captures Nuance**: Recursively visits websites to gather more information, downloading relevant documents to give the LLM the complete picture of the grant's intent, nuance in eligibility criterias. 
 
 ### 2. AI-Powered Relevance Analysis
 *   **Preliminary Scoring**: Rapidly categorizes grants based on high-level fit.
-*   **Deep Analysis**: Uses Gemini 1.5 Pro to evaluate specific criteria like "Funding Quantum" and "KPI alignment".
+*   **Deep Analysis**: Uses Gemini 3 Pro to evaluate specific criteria like "Funding Quantum" and "KPI alignment".
 
 ### 3. Organisation Dashboard
 *   **Profile Management**: configure organisation details, mission, and KPIs.
@@ -92,3 +96,4 @@ The core "pull" mechanism is built on a robust Playwright-based scraper that ens
     ```
 3.  Install dependencies: `pnpm install`
 4.  Start dev server: `pnpm dev`
+
